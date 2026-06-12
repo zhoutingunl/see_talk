@@ -45,7 +45,11 @@
 - ✅ 首个实验 `ocr_first`(on/off):量化"OCR 只发文本省 token vs 误判风险"
 - ✅ metrics 记录变体 + 按变体对比节省率/延迟;`/api/experiments` 看分配与对比
 - ✅ 前端 localStorage 稳定 session_id;真机验证 on/off 分桶 + 对比落库
-- ⏭ 连续分析模式、评估框架 → 后续 PR
+### PR8 · 评估框架(§17)
+- ✅ **可复现样例集**实测能力,避免伪指标:OCR 字符准确率 + 对话关键词命中率
+- ✅ 打分确定性(`difflib` 相似度 / 关键词命中),render/svc/ocr 可注入便于单测
+- ✅ `python3.11 evaluation.py` 跑真实服务出报告;真机:OCR 1.0、QA 1.0
+- ⏭ 连续分析模式(会议辅助)→ 后续 PR
 
 ## 运行
 
@@ -69,7 +73,7 @@ python3.11 app.py             # http://localhost:8000
 python3.11 -m pytest -q --cov=. --cov-report=term-missing
 ```
 
-**实测(本机 Python 3.11):89 passed,覆盖率 96%。**
+**实测(本机 Python 3.11):95 passed,覆盖率 96%。**
 策略遵循 design.md §22:Mock 云(MiniMax/百炼),只测确定性逻辑(载荷构造、响应解析、
 降级、入参校验、图片解析),不测非确定性的 AI 答案本身。未覆盖部分为 gevent 启动入口
 与需真实 Key 的初始化分支。
@@ -84,6 +88,7 @@ see_talk/
   metrics.py        SQLite:token 对账 / 节省率 / 延迟分桶 / 埋点
   ocr_service.py    本地 Tesseract OCR(OCR 优先路由)
   experiments.py    A/B 实验:确定性分桶 + 变体对比
+  evaluation.py     评估框架:OCR 准确率 + 对话成功率
   ai/
     service.py      AIService 统一入口(降级编排)
     minimax.py      MiniMax-M3 多模态客户端(非流式 + 流式)
