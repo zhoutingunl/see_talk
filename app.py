@@ -6,13 +6,15 @@ PR1 范围:摄像头抓帧 + 文字提问 → M3 多模态回答(无 key 时 Moc
 from __future__ import annotations
 
 import base64
+import json
 import logging
 import re
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, Response, jsonify, render_template, request
 
 import config
 from ai import get_service
+from ai.service import ASRUnavailable
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("seetalk")
@@ -41,7 +43,8 @@ def index():
 @app.get("/api/health")
 def health():
     svc = get_service()
-    return jsonify(status=config.status(), vision_live=svc.vision_live)
+    return jsonify(status=config.status(), vision_live=svc.vision_live,
+                   asr_live=svc.asr_live)
 
 
 @app.post("/api/ask")
@@ -68,6 +71,49 @@ def ask():
         degraded=reply.degraded,
         tokens={"input": reply.input_tokens, "output": reply.output_tokens},
     )
+
+
+@app.post("/api/ask_stream")
+def ask_stream():
+    """流式多模态(SSE):逐段 data:{type:delta|done}。供前端首句优先 TTS。"""
+    payload = request.get_json(silent=True) or {}
+    question = (payload.get("question") or "").strip()
+    if not question:
+        return jsonify(error="question 不能为空"), 400
+    image_b64, media_type = _parse_image(payload.get("image"))
+    if image_b64:
+        try:
+            base64.b64decode(image_b64, validate=True)
+        except Exception:
+            return jsonify(error="image 不是合法的 base64"), 400
+
+    def gen():
+        try:
+            for ev in get_service().vision_chat_stream(
+                    question, image_b64=image_b64, media_type=media_type):
+                yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
+        except Exception as e:  # 流中异常也以事件形式收尾,前端不挂死
+            log.warning("ask_stream 异常:%s", e)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    return Response(gen(), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@app.post("/api/asr")
+def asr():
+    """移动端 ASR:body 为单声道 16k PCM(application/octet-stream)→ {text}。"""
+    pcm = request.get_data() or b""
+    if len(pcm) < 320:  # 不足 ~10ms,视为空
+        return jsonify(error="音频为空"), 400
+    try:
+        text = get_service().transcribe(pcm)
+    except ASRUnavailable:
+        return jsonify(error="服务端 ASR 未配置,请用浏览器 Web Speech"), 503
+    except Exception as e:
+        log.warning("ASR 失败:%s", e)
+        return jsonify(error="识别失败"), 502
+    return jsonify(text=text)
 
 
 def main() -> None:

@@ -6,6 +6,7 @@ MiniMax 就绪则用 M3 多模态,否则 Mock;429/超时/网络异常一律降�
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
 
 import config
 from .mock import MockClient
@@ -14,14 +15,20 @@ from .types import ChatMessage, VisionReply
 log = logging.getLogger("seetalk.ai")
 
 
+class ASRUnavailable(RuntimeError):
+    """百炼未配置时调用服务端 ASR(移动端路径)抛出;桌面应改用浏览器 Web Speech。"""
+
+
 class AIService:
     def __init__(self) -> None:
         self._mock = MockClient()
         self._minimax = None
+        self._bailian = None
         self._setup_providers()
 
     def _setup_providers(self) -> None:
         self._minimax = None
+        self._bailian = None
         if config.minimax.ready:
             try:
                 from .minimax import MiniMaxClient
@@ -29,6 +36,13 @@ class AIService:
                 self._minimax = MiniMaxClient(config.minimax)
             except Exception as e:  # pragma: no cover - 环境相关
                 log.warning("MiniMax 初始化失败,退回 Mock:%s", e)
+        if config.bailian.ready:
+            try:
+                from .bailian import BailianASRClient
+
+                self._bailian = BailianASRClient(config.bailian)
+            except Exception as e:  # pragma: no cover - 环境相关
+                log.warning("百炼 ASR 初始化失败:%s", e)
 
     def reload(self) -> None:
         """配置变更后热重载接入(无需重启进程)。"""
@@ -37,6 +51,10 @@ class AIService:
     @property
     def vision_live(self) -> bool:
         return self._minimax is not None
+
+    @property
+    def asr_live(self) -> bool:
+        return self._bailian is not None
 
     def vision_chat(self, question: str, *, image_b64: str | None = None,
                     media_type: str = "image/jpeg",
@@ -54,6 +72,35 @@ class AIService:
         return self._mock.vision_chat(
             question, image_b64=image_b64, media_type=media_type,
             history=history, system=system, max_tokens=max_tokens)
+
+    def vision_chat_stream(self, question: str, *, image_b64: str | None = None,
+                           media_type: str = "image/jpeg",
+                           history: list[ChatMessage] | None = None,
+                           system: str | None = None,
+                           max_tokens: int = 1024) -> Iterator[dict]:
+        """流式多模态(首句优先)。失败降级 Mock;已吐内容则不混入 Mock。"""
+        if self._minimax is not None:
+            produced = False
+            try:
+                for ev in self._minimax.vision_chat_stream(
+                        question, image_b64=image_b64, media_type=media_type,
+                        history=history, system=system, max_tokens=max_tokens):
+                    produced = True
+                    yield ev
+                return
+            except Exception as e:
+                log.warning("MiniMax vision_chat_stream 失败,降级:%s", e)
+                if produced:
+                    return
+        yield from self._mock.vision_chat_stream(
+            question, image_b64=image_b64, media_type=media_type,
+            history=history, system=system, max_tokens=max_tokens)
+
+    def transcribe(self, pcm: bytes) -> str:
+        """服务端 ASR(移动端 = 百炼)。未配置则抛 ASRUnavailable,前端应回退 Web Speech。"""
+        if self._bailian is None:
+            raise ASRUnavailable("百炼 ASR 未配置")
+        return self._bailian.transcribe(pcm)
 
 
 _singleton: AIService | None = None

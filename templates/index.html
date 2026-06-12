@@ -26,16 +26,23 @@
     </section>
 
     <section class="chat">
+      <div class="voicebar">
+        <button id="micBtn" type="button">🎤 开始语音</button>
+        <span id="voiceState" class="vstate">未开始</span>
+        <button id="asrToggle" type="button" class="toggle">ASR：自动</button>
+      </div>
       <div id="log" class="log"></div>
       <form id="askForm">
         <input id="question" type="text" autocomplete="off"
-               placeholder="举起书 / 对准报错，问点什么…" required>
+               placeholder="举起书 / 对准报错，说话或打字…">
         <button id="askBtn" type="submit">提问</button>
       </form>
-      <p class="hint">PR1 用文字提问；语音（VAD + 百炼/WebSpeech）见 PR2。</p>
+      <p class="hint">免手语音：点「开始语音」后直接说话（VAD 自动断句）。桌面默认浏览器 Web Speech，移动端走百炼；可手动切换。</p>
     </section>
   </main>
 
+  <script src="{{ url_for('static', filename='tts.js') }}"></script>
+  <script src="{{ url_for('static', filename='voice.js') }}"></script>
   <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>

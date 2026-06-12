@@ -43,6 +43,11 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .line .txt { white-space: pre-wrap; line-height: 1.5; }
 .line .meta { font-size: 11px; color: #7d8aa6; margin-top: 4px; }
 
+.voicebar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+#micBtn.on { background: #c0392b; }
+.vstate { font-size: 13px; color: #9fb0d0; }
+.toggle { background: #3a3f4d; font-size: 12px; padding: 6px 10px; margin-left: auto; }
+
 #askForm { display: flex; gap: 8px; margin-top: 12px; }
 #question { flex: 1; padding: 9px 12px; border-radius: 8px; border: 1px solid #2c3242; background: #0f1115; color: #e6e8eb; }
 .hint { color: #6b7488; font-size: 12px; margin: 8px 2px 0; }

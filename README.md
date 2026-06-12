@@ -9,14 +9,19 @@
 → **MiniMax-M3 多模态**(Anthropic 兼容直连,真看像素)。ASR 桌面用浏览器 Web Speech、
 移动用百炼;TTS 浏览器免费 / 百炼高音质。唯一主要付费项是 M3 图片 token,所有省钱手段都削它。
 
-## 当前进度(PR1)
+## 当前进度
 
-最小「**抓帧 → 提问 → 回答**」闭环,验证多模态架构成立:
-
+### PR1 · 抓帧问答闭环
 - ✅ Flask 骨架 + `AIService`(M3 直连多模态 + Mock 降级层)
 - ✅ 前端开摄像头、按需抓 1 帧(降分 512px)、文字提问、显示回答与 token
 - ✅ 无 Key 时自动 Mock,项目照常可跑(产出明确标注"降级示例",不冒充)
-- ⏭ 语音(VAD + 百炼/WebSpeech ASR、首句优先 TTS)、成本 Dashboard、OCR 路由 → 后续 PR
+
+### PR2 · 语音交互闭环
+- ✅ **免手 VAD**:浏览器端能量阈值断句(`static/voice.js`)
+- ✅ **ASR 分层**:桌面浏览器 Web Speech(免费)/ 移动端百炼 Paraformer(`/api/asr` 代理,Key 仅在服务端)
+- ✅ **流式回答 + 首句优先 TTS**:`/api/ask_stream`(SSE)边收边播(`static/tts.js`)
+- ✅ 真机验证:M3 流式 SSE 实时输出;百炼 ASR 语音往返(合成「你好,这是语音识别测试」→ 准确转写)
+- ⏭ 成本 Dashboard、OCR 优先路由、连续分析模式 → 后续 PR
 
 ## 运行
 
@@ -37,7 +42,7 @@ python3.11 app.py             # http://localhost:8000
 python3.11 -m pytest -q --cov=. --cov-report=term-missing
 ```
 
-**实测(本机 Python 3.11):18 passed,覆盖率 96%。**
+**实测(本机 Python 3.11):39 passed,覆盖率 96%。**
 策略遵循 design.md §22:Mock 云(MiniMax/百炼),只测确定性逻辑(载荷构造、响应解析、
 降级、入参校验、图片解析),不测非确定性的 AI 答案本身。未覆盖部分为 gevent 启动入口
 与需真实 Key 的初始化分支。
