@@ -71,3 +71,18 @@ def test_percentile_helper():
     assert _percentile([], 50) == 0.0
     assert _percentile([10], 95) == 10
     assert _percentile([1, 2, 3, 4], 50) in (2, 3)
+
+
+def test_ab_breakdown_by_variant(store):
+    # on 组省 token(OCR 只发文本),off 组发整图
+    store.record_turn(turn_type="image", input_tokens=200, latency_ms=100, variant="on")
+    store.record_turn(turn_type="image", input_tokens=1300, latency_ms=200, variant="off")
+    ab = store.summary()["ab"]["ocr_first"]
+    assert ab["on"]["turns"] == 1 and ab["off"]["turns"] == 1
+    assert ab["on"]["savings_rate"] > ab["off"]["savings_rate"]
+    assert ab["off"]["avg_latency_ms"] == 200
+
+
+def test_ab_ignores_unbucketed(store):
+    store.record_turn(turn_type="image", input_tokens=100, variant="")
+    assert store.summary()["ab"]["ocr_first"] == {}

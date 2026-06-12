@@ -28,8 +28,23 @@ def test_dashboard_page(client):
 def test_metrics_endpoint_shape(client):
     j = client.get("/api/metrics").get_json()
     for k in ("turns", "savings_rate", "cache_hit_rate", "baseline_input_tokens",
-              "latency_ms", "cost_estimate_cny", "events"):
+              "latency_ms", "cost_estimate_cny", "events", "ab"):
         assert k in j
+
+
+def test_experiments_endpoint(client):
+    j = client.get("/api/experiments?session_id=u1").get_json()
+    assert "ocr_first" in j["experiments"]
+    assert j["assignment"]["ocr_first"] in ("on", "off")
+    assert "results" in j
+
+
+def test_ask_records_variant(client):
+    client.post("/api/ask", json={"question": "你好", "session_id": "u-abc"})
+    # 该 session 的变体应出现在 ab 结果里(若该轮被分桶记录)
+    ab = client.get("/api/metrics").get_json()["ab"]["ocr_first"]
+    from experiments import assign
+    assert assign("u-abc", "ocr_first") in ab
 
 
 def test_ask_records_a_turn(client):

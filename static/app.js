@@ -17,6 +17,12 @@ const asrToggle = document.getElementById('asrToggle');
 const ttsToggle = document.getElementById('ttsToggle');
 
 let stream = null;
+// 稳定 session_id(A/B 分桶用,design.md §18),存 localStorage 保持同一变体
+const SID = (() => {
+  let s = localStorage.getItem('seetalk_sid');
+  if (!s) { s = 'sid-' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('seetalk_sid', s); }
+  return s;
+})();
 const speaker = new window.SentenceSpeaker({ lang: 'zh-CN' });
 const voice = new window.VoiceInput({ onTranscript: handleUtterance, onState: setVoiceState });
 
@@ -78,7 +84,7 @@ async function ask(question) {
     const r = await fetch('/api/ask_stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question, image }),
+      body: JSON.stringify({ question, image, session_id: SID }),
     });
     if (!r.ok) { txt.textContent = '错误：HTTP ' + r.status; pending.classList.add('err'); return; }
 

@@ -47,7 +47,7 @@ class MetricsStore:
                     id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT,
                     session_id TEXT, turn_type TEXT, route TEXT, source TEXT,
                     cache_hit INTEGER, input_tokens INTEGER, output_tokens INTEGER,
-                    latency_ms REAL)""")
+                    latency_ms REAL, variant TEXT DEFAULT '')""")
             self._conn.execute("""
                 CREATE TABLE IF NOT EXISTS events(
                     id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, name TEXT, data TEXT)""")
@@ -56,13 +56,14 @@ class MetricsStore:
     def record_turn(self, *, session_id: str = "", turn_type: str = "image",
                     route: str = "image", source: str = "minimax",
                     cache_hit: bool = False, input_tokens: int = 0,
-                    output_tokens: int = 0, latency_ms: float = 0.0) -> None:
+                    output_tokens: int = 0, latency_ms: float = 0.0,
+                    variant: str = "") -> None:
         with self._lock, self._conn:
             self._conn.execute(
                 "INSERT INTO turns(ts,session_id,turn_type,route,source,cache_hit,"
-                "input_tokens,output_tokens,latency_ms) VALUES(?,?,?,?,?,?,?,?,?)",
+                "input_tokens,output_tokens,latency_ms,variant) VALUES(?,?,?,?,?,?,?,?,?,?)",
                 (_now(), session_id, turn_type, route, source, int(cache_hit),
-                 input_tokens, output_tokens, latency_ms))
+                 input_tokens, output_tokens, latency_ms, variant))
 
     def track(self, name: str, data: dict | None = None) -> None:
         """埋点(design.md §19)。"""
@@ -97,6 +98,7 @@ class MetricsStore:
         ev_total = self._conn.execute("SELECT COUNT(*) c FROM events").fetchone()["c"]
 
         return {
+            "ab": {"ocr_first": self._ab_breakdown(rows)},
             "turns": total,
             "cache_hits": cache_hits,
             "cache_hit_rate": round(cache_hits / total, 3) if total else 0.0,
@@ -109,6 +111,25 @@ class MetricsStore:
             "cost_estimate_cny": cost,
             "events": ev_total,
         }
+
+    @staticmethod
+    def _ab_breakdown(rows) -> dict:
+        """按变体对比:轮数 / 节省率 / 平均延迟(design.md §18)。"""
+        groups: dict[str, list] = {}
+        for r in rows:
+            v = r["variant"] or ""
+            if v:
+                groups.setdefault(v, []).append(r)
+        out = {}
+        for v, vr in groups.items():
+            vin = sum(x["input_tokens"] for x in vr)
+            base = len(vr) * BASELINE_IMAGE_TOKENS
+            out[v] = {
+                "turns": len(vr),
+                "savings_rate": round(max(0.0, 1 - vin / base), 3) if base else 0.0,
+                "avg_latency_ms": round(sum(x["latency_ms"] for x in vr) / len(vr), 1),
+            }
+        return out
 
     def reset(self) -> None:
         with self._lock, self._conn:
