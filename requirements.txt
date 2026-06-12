@@ -1,6 +1,7 @@
 flask>=3.0
 gevent>=24.0
 requests>=2.31
+websocket-client>=1.7
 python-dotenv>=1.0
 pytest>=8.0
 pytest-cov>=5.0

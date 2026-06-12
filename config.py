@@ -46,10 +46,13 @@ class MiniMaxConfig:
 
 @dataclass(frozen=True)
 class BailianConfig:
-    """阿里百炼 Paraformer 实时 ASR(移动端,PR2 接入)。"""
+    """阿里百炼 Paraformer 实时 ASR(移动端)。国内站 DashScope WS 端点。"""
 
     api_key: str = ""
     asr_model: str = "paraformer-realtime-v2"
+    ws_url: str = "wss://dashscope.aliyuncs.com/api-ws/v1/inference"
+    sample_rate: int = 16000
+    audio_format: str = "pcm"
 
     @property
     def ready(self) -> bool:
@@ -78,6 +81,7 @@ def build() -> tuple[MiniMaxConfig, BailianConfig, PlanConfig]:
     bl = BailianConfig(
         api_key=_clean(_get("BAILIAN_API_KEY")),
         asr_model=_get("BAILIAN_ASR_MODEL", "paraformer-realtime-v2"),
+        ws_url=_get("BAILIAN_WS_URL", "wss://dashscope.aliyuncs.com/api-ws/v1/inference"),
     )
     try:
         turns = int(_get("PLAN_TEXT_HISTORY_TURNS", "10"))
