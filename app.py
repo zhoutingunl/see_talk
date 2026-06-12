@@ -16,6 +16,7 @@ from flask import Flask, Response, jsonify, render_template, request
 import config
 import experiments
 import metrics
+import observations
 import ocr_service
 import vision_cache
 from ai import get_service
@@ -262,6 +263,58 @@ def tts():
         return jsonify(error="合成失败"), 502
     metrics.get_store().track("tts_success", {"chars": len(text)})
     return Response(audio, mimetype="audio/mpeg")
+
+
+_OBSERVE_PROMPT = "用一句话客观描述当前画面的主要内容(人物/动作/文字/场景),不要寒暄。"
+
+
+@app.post("/api/observe")
+def observe():
+    """连续分析模式:{session_id, image} → 描述并累积。画面没变则跳过(省钱)。"""
+    payload = request.get_json(silent=True) or {}
+    sid = (payload.get("session_id") or "anon").strip() or "anon"
+    image_b64, media_type = _parse_image(payload.get("image"))
+    if not image_b64:
+        return jsonify(error="缺少 image"), 400
+    try:
+        base64.b64decode(image_b64, validate=True)
+    except Exception:
+        return jsonify(error="image 不是合法的 base64"), 400
+
+    obs = observations.get_store()
+    h = _frame_hash(image_b64)
+    if not obs.scene_changed(sid, h):
+        metrics.get_store().track("observe_skip", {})
+        return jsonify(skipped=True, reason="画面未变化")
+
+    t0 = time.monotonic()
+    reply = get_service().vision_chat(_OBSERVE_PROMPT, image_b64=image_b64,
+                                      media_type=media_type)
+    obs.add(sid, reply.text)
+    obs.mark(sid, h)
+    _record("image", "observe", reply, False, t0, session_id=sid)
+    metrics.get_store().track("observe", {})
+    return jsonify(skipped=False, text=reply.text, count=len(obs.get(sid)))
+
+
+@app.post("/api/summary")
+def summary():
+    """把连续观察汇总成会议/场景纪要(纯文本汇总,省 token)。"""
+    payload = request.get_json(silent=True) or {}
+    sid = (payload.get("session_id") or "anon").strip() or "anon"
+    obs = observations.get_store()
+    items = obs.get(sid)
+    text = observations.summarize(get_service(), items)
+    metrics.get_store().track("summary", {"n": len(items)})
+    return jsonify(summary=text, n=len(items))
+
+
+@app.post("/api/observe/clear")
+def observe_clear():
+    payload = request.get_json(silent=True) or {}
+    sid = (payload.get("session_id") or "anon").strip() or "anon"
+    observations.get_store().clear(sid)
+    return jsonify(ok=True)
 
 
 def main() -> None:

@@ -59,3 +59,9 @@ header a.badge { text-decoration: none; }
 .card.stat .k { font-size: 13px; color: #8b93a7; }
 .card.stat .v { font-size: 28px; font-weight: 600; margin: 6px 0; color: #e6e8eb; }
 .card.stat .s { font-size: 12px; color: #7d8aa6; }
+
+.obslog { margin-top: 10px; max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.obs { font-size: 13px; padding: 6px 8px; border-radius: 6px; background: #1b1f2b; color: #cdd4e0; }
+.obs.summary { background: #243a2b; color: #cfeada; }
+.obs.muted { color: #7d8aa6; }
+.obs.err { background: #3a2530; }

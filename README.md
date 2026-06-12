@@ -49,7 +49,12 @@
 - ✅ **可复现样例集**实测能力,避免伪指标:OCR 字符准确率 + 对话关键词命中率
 - ✅ 打分确定性(`difflib` 相似度 / 关键词命中),render/svc/ocr 可注入便于单测
 - ✅ `python3.11 evaluation.py` 跑真实服务出报告;真机:OCR 1.0、QA 1.0
-- ⏭ 连续分析模式(会议辅助)→ 后续 PR
+### PR9 · 连续分析模式(会议辅助,Story 5)
+- ✅ `/api/observe` 每帧客观描述并累积;**变化检测**画面没变即跳过(省钱)
+- ✅ `/api/summary` 把连续观察交给 M3 汇总成会议/场景纪要(纯文本汇总省 token)
+- ✅ 前端「连续分析」开关每 4s 抓帧 + 「生成纪要」按钮
+- ✅ 真机验证:幻灯片切换逐帧描述、重复帧跳过、纪要正确追踪变化
+- 🎉 design.md MVP + 全部 §14 省钱杠杆 + §17/§18 框架 + 会议辅助 全部落地
 
 ## 运行
 
@@ -73,7 +78,7 @@ python3.11 app.py             # http://localhost:8000
 python3.11 -m pytest -q --cov=. --cov-report=term-missing
 ```
 
-**实测(本机 Python 3.11):95 passed,覆盖率 96%。**
+**实测(本机 Python 3.11):103 passed,覆盖率 96%。**
 策略遵循 design.md §22:Mock 云(MiniMax/百炼),只测确定性逻辑(载荷构造、响应解析、
 降级、入参校验、图片解析),不测非确定性的 AI 答案本身。未覆盖部分为 gevent 启动入口
 与需真实 Key 的初始化分支。
@@ -89,6 +94,7 @@ see_talk/
   ocr_service.py    本地 Tesseract OCR(OCR 优先路由)
   experiments.py    A/B 实验:确定性分桶 + 变体对比
   evaluation.py     评估框架:OCR 准确率 + 对话成功率
+  observations.py   连续分析:观察累积 + 变化检测 + 纪要汇总
   ai/
     service.py      AIService 统一入口(降级编排)
     minimax.py      MiniMax-M3 多模态客户端(非流式 + 流式)
