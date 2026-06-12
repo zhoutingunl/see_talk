@@ -35,7 +35,12 @@
 - ✅ Dashboard 新增**路由分布**(ocr/image/cache)
 - ✅ 真机验证:英文报错图 → `route=ocr`,input token 72(发图需数百),M3 正确解释 TypeError
 - ✅ **中文 OCR**:`chi_sim+eng`,中文文本场景也走 OCR 路由(真机:「系统错误:文件未找到」识别置信度 96%)
-- ⏭ 连续分析模式、百炼高音质 TTS、A/B 实验框架 → 后续 PR
+### PR6 · 百炼高音质 TTS(CosyVoice)
+- ✅ **CosyVoice 实时合成**(`ai/bailian_tts.py`,DashScope WS,复用 ASR 同一把 Key)
+- ✅ `/api/tts`(text → mp3);前端 TTS 双模式可切:浏览器(免费默认)/ 百炼高音质(付费档)
+- ✅ 首句优先沿用:逐句合成播放;百炼不可用自动回退浏览器
+- ✅ 真机验证:`cosyvoice-v2 + longxiaochun_v2` 合成 22050Hz 合法 MP3
+- ⏭ 连续分析模式、A/B 实验框架、评估框架 → 后续 PR
 
 ## 运行
 
@@ -59,7 +64,7 @@ python3.11 app.py             # http://localhost:8000
 python3.11 -m pytest -q --cov=. --cov-report=term-missing
 ```
 
-**实测(本机 Python 3.11):69 passed,覆盖率 96%。**
+**实测(本机 Python 3.11):79 passed,覆盖率 96%。**
 策略遵循 design.md §22:Mock 云(MiniMax/百炼),只测确定性逻辑(载荷构造、响应解析、
 降级、入参校验、图片解析),不测非确定性的 AI 答案本身。未覆盖部分为 gevent 启动入口
 与需真实 Key 的初始化分支。
@@ -68,7 +73,7 @@ python3.11 -m pytest -q --cov=. --cov-report=term-missing
 
 ```
 see_talk/
-  app.py            Flask 入口:/api/ask · /api/ask_stream(SSE)· /api/asr · /dashboard
+  app.py            Flask 入口:/api/ask · /api/ask_stream · /api/asr · /api/tts · /dashboard
   config.py         env/.env 配置 + PlanConfig 档位
   vision_cache.py   感知哈希:视觉缓存 + 变化检测(省钱核心)
   metrics.py        SQLite:token 对账 / 节省率 / 延迟分桶 / 埋点
@@ -77,6 +82,7 @@ see_talk/
     service.py      AIService 统一入口(降级编排)
     minimax.py      MiniMax-M3 多模态客户端(非流式 + 流式)
     bailian.py      百炼 Paraformer 实时 ASR(DashScope WS)
+    bailian_tts.py  百炼 CosyVoice 实时 TTS(DashScope WS)
     mock.py         无 Key 降级层
     types.py        ChatMessage / VisionReply
   templates/        index.html · dashboard.html

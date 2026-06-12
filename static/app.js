@@ -14,6 +14,7 @@ const askBtn = document.getElementById('askBtn');
 const micBtn = document.getElementById('micBtn');
 const voiceState = document.getElementById('voiceState');
 const asrToggle = document.getElementById('asrToggle');
+const ttsToggle = document.getElementById('ttsToggle');
 
 let stream = null;
 const speaker = new window.SentenceSpeaker({ lang: 'zh-CN' });
@@ -35,6 +36,7 @@ async function refreshHealth() {
     badge.textContent = j.vision_live ? 'M3 已接入' : 'Mock 模式（未配 Key）';
     badge.classList.toggle('live', j.vision_live);
     window.__asrLive = j.asr_live;
+    window.__ttsLive = j.tts_live;
   } catch { badge.textContent = '后端不可达'; }
 }
 
@@ -153,6 +155,17 @@ micBtn.addEventListener('click', async () => {
 asrToggle.addEventListener('click', () => {
   voice.setProvider(voice.provider === 'webspeech' ? 'bailian' : 'webspeech');
   asrToggle.textContent = 'ASR：' + voice.providerLabel;
+});
+
+ttsToggle.addEventListener('click', () => {
+  if (speaker.mode === 'browser') {
+    if (!window.__ttsLive) { addLine('系统', '高音质 TTS 未配置（需百炼 Key）', 'err'); return; }
+    speaker.setMode('bailian');
+    ttsToggle.textContent = 'TTS：百炼高音质';
+  } else {
+    speaker.setMode('browser');
+    ttsToggle.textContent = 'TTS：浏览器';
+  }
 });
 
 asrToggle.textContent = 'ASR：' + voice.providerLabel;

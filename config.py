@@ -46,13 +46,18 @@ class MiniMaxConfig:
 
 @dataclass(frozen=True)
 class BailianConfig:
-    """阿里百炼 Paraformer 实时 ASR(移动端)。国内站 DashScope WS 端点。"""
+    """阿里百炼:Paraformer 实时 ASR + CosyVoice 实时 TTS。国内站 DashScope WS。"""
 
     api_key: str = ""
     asr_model: str = "paraformer-realtime-v2"
     ws_url: str = "wss://dashscope.aliyuncs.com/api-ws/v1/inference"
     sample_rate: int = 16000
     audio_format: str = "pcm"
+    # CosyVoice TTS(高音质,付费档)
+    tts_model: str = "cosyvoice-v2"
+    tts_voice: str = "longxiaochun_v2"
+    tts_format: str = "mp3"
+    tts_sample_rate: int = 22050
 
     @property
     def ready(self) -> bool:
@@ -82,6 +87,8 @@ def build() -> tuple[MiniMaxConfig, BailianConfig, PlanConfig]:
         api_key=_clean(_get("BAILIAN_API_KEY")),
         asr_model=_get("BAILIAN_ASR_MODEL", "paraformer-realtime-v2"),
         ws_url=_get("BAILIAN_WS_URL", "wss://dashscope.aliyuncs.com/api-ws/v1/inference"),
+        tts_model=_get("BAILIAN_TTS_MODEL", "cosyvoice-v2"),
+        tts_voice=_get("BAILIAN_TTS_VOICE", "longxiaochun_v2"),
     )
     try:
         turns = int(_get("PLAN_TEXT_HISTORY_TURNS", "10"))

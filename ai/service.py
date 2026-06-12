@@ -19,16 +19,22 @@ class ASRUnavailable(RuntimeError):
     """百炼未配置时调用服务端 ASR(移动端路径)抛出;桌面应改用浏览器 Web Speech。"""
 
 
+class TTSUnavailable(RuntimeError):
+    """百炼未配置时调用高音质 TTS 抛出;前端应回退浏览器 speechSynthesis。"""
+
+
 class AIService:
     def __init__(self) -> None:
         self._mock = MockClient()
         self._minimax = None
         self._bailian = None
+        self._bailian_tts = None
         self._setup_providers()
 
     def _setup_providers(self) -> None:
         self._minimax = None
         self._bailian = None
+        self._bailian_tts = None
         if config.minimax.ready:
             try:
                 from .minimax import MiniMaxClient
@@ -43,6 +49,12 @@ class AIService:
                 self._bailian = BailianASRClient(config.bailian)
             except Exception as e:  # pragma: no cover - 环境相关
                 log.warning("百炼 ASR 初始化失败:%s", e)
+            try:
+                from .bailian_tts import BailianTTSClient
+
+                self._bailian_tts = BailianTTSClient(config.bailian)
+            except Exception as e:  # pragma: no cover - 环境相关
+                log.warning("百炼 TTS 初始化失败:%s", e)
 
     def reload(self) -> None:
         """配置变更后热重载接入(无需重启进程)。"""
@@ -101,6 +113,16 @@ class AIService:
         if self._bailian is None:
             raise ASRUnavailable("百炼 ASR 未配置")
         return self._bailian.transcribe(pcm)
+
+    @property
+    def tts_live(self) -> bool:
+        return self._bailian_tts is not None
+
+    def synthesize(self, text: str) -> bytes:
+        """高音质 TTS(百炼 CosyVoice)。未配置则抛 TTSUnavailable,前端回退浏览器合成。"""
+        if self._bailian_tts is None:
+            raise TTSUnavailable("百炼 TTS 未配置")
+        return self._bailian_tts.synthesize(text)
 
 
 _singleton: AIService | None = None

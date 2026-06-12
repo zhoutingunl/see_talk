@@ -18,7 +18,7 @@ import metrics
 import ocr_service
 import vision_cache
 from ai import get_service
-from ai.service import ASRUnavailable
+from ai.service import ASRUnavailable, TTSUnavailable
 from ai.types import VisionReply
 
 logging.basicConfig(level=logging.INFO)
@@ -101,7 +101,7 @@ def api_metrics():
 def health():
     svc = get_service()
     return jsonify(status=config.status(), vision_live=svc.vision_live,
-                   asr_live=svc.asr_live)
+                   asr_live=svc.asr_live, tts_live=svc.tts_live)
 
 
 @app.post("/api/ask")
@@ -219,6 +219,25 @@ def asr():
         return jsonify(error="识别失败"), 502
     metrics.get_store().track("asr_success", {"bytes": len(pcm)})
     return jsonify(text=text)
+
+
+@app.post("/api/tts")
+def tts():
+    """高音质 TTS(百炼 CosyVoice):{text} → audio/mpeg。未配置 503,前端回退浏览器合成。"""
+    payload = request.get_json(silent=True) or {}
+    text = (payload.get("text") or "").strip()
+    if not text:
+        return jsonify(error="text 不能为空"), 400
+    try:
+        audio = get_service().synthesize(text)
+    except TTSUnavailable:
+        return jsonify(error="高音质 TTS 未配置,请用浏览器合成"), 503
+    except Exception as e:
+        log.warning("TTS 失败:%s", e)
+        metrics.get_store().track("tts_fail", {})
+        return jsonify(error="合成失败"), 502
+    metrics.get_store().track("tts_success", {"chars": len(text)})
+    return Response(audio, mimetype="audio/mpeg")
 
 
 def main() -> None:
