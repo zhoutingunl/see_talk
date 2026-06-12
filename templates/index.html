@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SeeTalk · AI 视觉对话助手</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <h1>SeeTalk</h1>
+    <span class="sub">视觉对话助手 · PR1 抓帧问答闭环</span>
+    <span id="badge" class="badge">检测中…</span>
+  </header>
+
+  <main>
+    <section class="cam">
+      <!-- 隐私:UI 常驻"正在看"指示(design.md §25) -->
+      <div class="watching">👁 摄像头预览（仅提问瞬间抓 1 帧上行）</div>
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="canvas" hidden></canvas>
+      <div class="cam-controls">
+        <button id="startCam">开启摄像头</button>
+        <button id="stopCam" disabled>暂停</button>
+      </div>
+    </section>
+
+    <section class="chat">
+      <div id="log" class="log"></div>
+      <form id="askForm">
+        <input id="question" type="text" autocomplete="off"
+               placeholder="举起书 / 对准报错，问点什么…" required>
+        <button id="askBtn" type="submit">提问</button>
+      </form>
+      <p class="hint">PR1 用文字提问；语音（VAD + 百炼/WebSpeech）见 PR2。</p>
+    </section>
+  </main>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
