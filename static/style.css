@@ -1,0 +1,48 @@
+* { box-sizing: border-box; }
+body {
+  margin: 0; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: #0f1115; color: #e6e8eb;
+}
+header {
+  display: flex; align-items: baseline; gap: 12px;
+  padding: 14px 20px; border-bottom: 1px solid #232733; background: #151823;
+}
+header h1 { margin: 0; font-size: 20px; }
+header .sub { color: #8b93a7; font-size: 13px; }
+.badge {
+  margin-left: auto; font-size: 12px; padding: 3px 10px; border-radius: 999px;
+  background: #3a2b2b; color: #e8b3b3;
+}
+.badge.live { background: #243a2b; color: #9fe2b6; }
+
+main {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  max-width: 1100px; margin: 20px auto; padding: 0 16px;
+}
+@media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+
+.cam, .chat { background: #151823; border: 1px solid #232733; border-radius: 12px; padding: 14px; }
+.watching { font-size: 12px; color: #9fb0d0; margin-bottom: 8px; }
+video { width: 100%; border-radius: 8px; background: #000; aspect-ratio: 4/3; object-fit: cover; }
+.cam-controls { margin-top: 10px; display: flex; gap: 8px; }
+
+button {
+  background: #2b5cff; color: #fff; border: 0; border-radius: 8px;
+  padding: 8px 14px; font-size: 14px; cursor: pointer;
+}
+button:disabled { opacity: .45; cursor: not-allowed; }
+#stopCam { background: #3a3f4d; }
+
+.chat { display: flex; flex-direction: column; }
+.log { flex: 1; min-height: 320px; max-height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+.line { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 8px; background: #1b1f2b; }
+.line.me { background: #1d2740; align-self: flex-end; max-width: 85%; }
+.line.ai { background: #1b1f2b; max-width: 90%; }
+.line.err { background: #3a2530; }
+.line .who { font-size: 11px; color: #8b93a7; }
+.line .txt { white-space: pre-wrap; line-height: 1.5; }
+.line .meta { font-size: 11px; color: #7d8aa6; margin-top: 4px; }
+
+#askForm { display: flex; gap: 8px; margin-top: 12px; }
+#question { flex: 1; padding: 9px 12px; border-radius: 8px; border: 1px solid #2c3242; background: #0f1115; color: #e6e8eb; }
+.hint { color: #6b7488; font-size: 12px; margin: 8px 2px 0; }
