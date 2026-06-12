@@ -88,6 +88,10 @@ class MetricsStore:
         latency = {t: {"p50": _percentile(v, 50), "p95": _percentile(v, 95), "n": len(v)}
                    for t, v in lat.items() if v}
 
+        routes: dict[str, int] = {}
+        for r in rows:
+            routes[r["route"]] = routes.get(r["route"], 0) + 1
+
         cost = round(in_tok / 1000 * PRICE_IN_PER_1K
                      + out_tok / 1000 * PRICE_OUT_PER_1K, 4)
         ev_total = self._conn.execute("SELECT COUNT(*) c FROM events").fetchone()["c"]
@@ -101,6 +105,7 @@ class MetricsStore:
             "baseline_input_tokens": baseline_in,
             "savings_rate": round(max(0.0, savings), 3),
             "latency_ms": latency,
+            "routes": routes,
             "cost_estimate_cny": cost,
             "events": ev_total,
         }
