@@ -51,3 +51,11 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 #askForm { display: flex; gap: 8px; margin-top: 12px; }
 #question { flex: 1; padding: 9px 12px; border-radius: 8px; border: 1px solid #2c3242; background: #0f1115; color: #e6e8eb; }
 .hint { color: #6b7488; font-size: 12px; margin: 8px 2px 0; }
+
+header a.badge { text-decoration: none; }
+.dash { display: block; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.card.stat { background: #151823; border: 1px solid #232733; border-radius: 12px; padding: 16px; }
+.card.stat .k { font-size: 13px; color: #8b93a7; }
+.card.stat .v { font-size: 28px; font-weight: 600; margin: 6px 0; color: #e6e8eb; }
+.card.stat .s { font-size: 12px; color: #7d8aa6; }
