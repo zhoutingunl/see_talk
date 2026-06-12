@@ -15,14 +15,15 @@ import ocr_service
 from ocr_service import OcrService
 
 
-def _text_img(text: str) -> str:
+def _text_img(text: str, fonts=None) -> str:
     from PIL import Image, ImageDraw, ImageFont
 
-    img = Image.new("RGB", (420, 140), "white")
+    img = Image.new("RGB", (480, 140), "white")
     d = ImageDraw.Draw(img)
     font = None
-    for p in ("/System/Library/Fonts/Supplemental/Arial.ttf",
-              "/Library/Fonts/Arial.ttf", "/System/Library/Fonts/Helvetica.ttc"):
+    for p in (fonts or ("/System/Library/Fonts/Supplemental/Arial.ttf",
+                        "/Library/Fonts/Arial.ttf",
+                        "/System/Library/Fonts/Helvetica.ttc")):
         try:
             font = ImageFont.truetype(p, 48)
             break
@@ -32,6 +33,11 @@ def _text_img(text: str) -> str:
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return base64.b64encode(buf.getvalue()).decode()
+
+
+_CJK_FONTS = ("/System/Library/Fonts/PingFang.ttc",
+              "/System/Library/Fonts/STHeiti Medium.ttc",
+              "/System/Library/Fonts/Supplemental/Songti.ttc")
 
 
 # ---------- 判定逻辑(确定性)----------
@@ -57,6 +63,35 @@ def test_extract_reads_english():
     assert n >= 1
     up = text.upper()
     assert ("ERROR" in up or "ERRO" in up) or ("404" in up or "40" in up)
+
+
+def test_pick_lang_prefers_chinese_when_available():
+    import pytesseract
+
+    svc = OcrService()
+    if not svc.enabled:
+        pytest.skip("本机无 tesseract")
+    langs = set(pytesseract.get_languages(config=""))
+    if "chi_sim" in langs:
+        assert "chi_sim" in svc.lang
+    else:
+        assert svc.lang == "eng"
+
+
+def test_lang_override():
+    svc = OcrService(lang="eng")
+    assert svc.lang == "eng"
+
+
+def test_extract_reads_chinese():
+    import pytesseract
+
+    svc = OcrService(min_chars=1, min_conf=0)
+    if not svc.enabled or "chi_sim" not in pytesseract.get_languages(config=""):
+        pytest.skip("无 tesseract 或无 chi_sim 中文包")
+    text, conf, n = svc.extract(_text_img("计算机网络", fonts=_CJK_FONTS))
+    assert n >= 1
+    assert any(c in text for c in "计算机网络")  # 容忍个别字识别误差
 
 
 # ---------- app 路由(Fake 注入,确定性)----------

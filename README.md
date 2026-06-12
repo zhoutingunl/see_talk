@@ -34,6 +34,7 @@
 - ✅ 路由判定:字符数 + 置信度阈值;非文本场景仍发降分图;无 tesseract 自动退化为发图
 - ✅ Dashboard 新增**路由分布**(ocr/image/cache)
 - ✅ 真机验证:英文报错图 → `route=ocr`,input token 72(发图需数百),M3 正确解释 TypeError
+- ✅ **中文 OCR**:`chi_sim+eng`,中文文本场景也走 OCR 路由(真机:「系统错误:文件未找到」识别置信度 96%)
 - ⏭ 连续分析模式、百炼高音质 TTS、A/B 实验框架 → 后续 PR
 
 ## 运行
@@ -48,6 +49,9 @@ python3.11 app.py             # http://localhost:8000
 顶部徽标显示当前是「M3 已接入」还是「Mock 模式」。
 
 > 注:摄像头需 `https` 或 `localhost` 才能在浏览器开启(getUserMedia 安全上下文限制)。
+>
+> OCR 优先路由需本地 tesseract;中文场景需 `chi_sim` 语言包(放入 tessdata 目录)。
+> 缺包时自动退化为发图,功能不受影响。可用 `OCR_LANG` 覆盖语言(默认自动 `chi_sim+eng`)。
 
 ## 测试
 
@@ -55,7 +59,7 @@ python3.11 app.py             # http://localhost:8000
 python3.11 -m pytest -q --cov=. --cov-report=term-missing
 ```
 
-**实测(本机 Python 3.11):66 passed,覆盖率 96%。**
+**实测(本机 Python 3.11):69 passed,覆盖率 96%。**
 策略遵循 design.md §22:Mock 云(MiniMax/百炼),只测确定性逻辑(载荷构造、响应解析、
 降级、入参校验、图片解析),不测非确定性的 AI 答案本身。未覆盖部分为 gevent 启动入口
 与需真实 Key 的初始化分支。

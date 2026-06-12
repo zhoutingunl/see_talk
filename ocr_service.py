@@ -11,15 +11,18 @@ from __future__ import annotations
 import base64
 import io
 import logging
+import os
 
 log = logging.getLogger("seetalk.ocr")
 
 
 class OcrService:
-    def __init__(self, min_chars: int = 8, min_conf: float = 60.0):
+    def __init__(self, min_chars: int = 8, min_conf: float = 60.0,
+                 lang: str | None = None):
         self.min_chars = min_chars
         self.min_conf = min_conf
         self.enabled = self._detect()
+        self.lang = lang or self._pick_lang()
 
     @staticmethod
     def _detect() -> bool:
@@ -32,6 +35,18 @@ class OcrService:
             log.info("Tesseract 不可用,OCR 优先路由退化为始终发图:%s", e)
             return False
 
+    @staticmethod
+    def _pick_lang() -> str:
+        """优先 中文+英文;缺中文包则退英文。装 chi_sim.traineddata 即自动启用。"""
+        try:
+            import pytesseract
+
+            langs = set(pytesseract.get_languages(config=""))
+            parts = [x for x in ("chi_sim", "eng") if x in langs]
+            return "+".join(parts) or "eng"
+        except Exception:  # pragma: no cover - 环境相关
+            return "eng"
+
     def extract(self, image_b64: str) -> tuple[str, float, int]:
         """返回 (文本, 平均置信度, 字符数)。失败/未启用返回空。"""
         if not self.enabled:
@@ -42,7 +57,7 @@ class OcrService:
 
             img = Image.open(io.BytesIO(base64.b64decode(image_b64)))
             data = pytesseract.image_to_data(
-                img, output_type=pytesseract.Output.DICT)
+                img, lang=self.lang, output_type=pytesseract.Output.DICT)
             words, confs = [], []
             for t, c in zip(data["text"], data["conf"]):
                 t = t.strip()
@@ -71,5 +86,5 @@ _ocr: OcrService | None = None
 def get_ocr() -> OcrService:
     global _ocr
     if _ocr is None:
-        _ocr = OcrService()
+        _ocr = OcrService(lang=os.getenv("OCR_LANG") or None)
     return _ocr
