@@ -9,17 +9,24 @@ import base64
 import json
 import logging
 import re
+import time
 
 from flask import Flask, Response, jsonify, render_template, request
 
 import config
+import metrics
+import vision_cache
 from ai import get_service
 from ai.service import ASRUnavailable
+from ai.types import VisionReply
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("seetalk")
 
 app = Flask(__name__)
+
+# 进程级视觉缓存(变化检测 + 同画面复用,design.md §14)
+_cache = vision_cache.VisionCache()
 
 # data URL 前缀:data:image/jpeg;base64,xxxx
 _DATA_URL = re.compile(r"^data:(?P<mt>image/[\w.+-]+);base64,(?P<data>.+)$", re.S)
@@ -35,9 +42,40 @@ def _parse_image(raw: str | None) -> tuple[str | None, str]:
     return raw.strip(), "image/jpeg"
 
 
+def _frame_hash(image_b64: str | None) -> int:
+    return vision_cache.average_hash(image_b64) if image_b64 else 0
+
+
+def _record(turn_type: str, route: str, reply: VisionReply,
+            cache_hit: bool, t0: float) -> None:
+    store = metrics.get_store()
+    store.record_turn(
+        turn_type=turn_type, route=route, source=reply.source, cache_hit=cache_hit,
+        input_tokens=0 if cache_hit else reply.input_tokens,
+        output_tokens=0 if cache_hit else reply.output_tokens,
+        latency_ms=(time.monotonic() - t0) * 1000)
+    store.track("cache_hit" if cache_hit else
+                ("vision_success" if reply.source == "minimax" else "vision_mock"),
+                {"route": route})
+
+
+def _sse(ev: dict) -> str:
+    return f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
+
+
 @app.get("/")
 def index():
     return render_template("index.html")
+
+
+@app.get("/dashboard")
+def dashboard():
+    return render_template("dashboard.html")
+
+
+@app.get("/api/metrics")
+def api_metrics():
+    return jsonify(metrics.get_store().summary())
 
 
 @app.get("/api/health")
@@ -63,13 +101,28 @@ def ask():
         except Exception:
             return jsonify(error="image 不是合法的 base64"), 400
 
-    reply = get_service().vision_chat(
-        question, image_b64=image_b64, media_type=media_type)
+    t0 = time.monotonic()
+    h = _frame_hash(image_b64)
+    turn_type = "image" if image_b64 else "text"
+    cached = _cache.get(h, question) if image_b64 else None
+    if cached is not None:
+        reply, cache_hit, route = cached, True, "cache"
+    else:
+        reply = get_service().vision_chat(
+            question, image_b64=image_b64, media_type=media_type)
+        cache_hit, route = False, ("image" if image_b64 else "text")
+        if image_b64 and reply.source == "minimax":
+            _cache.put(h, question, reply)
+    _cache.mark(h)
+    _record(turn_type, route, reply, cache_hit, t0)
     return jsonify(
         answer=reply.text,
         source=reply.source,
         degraded=reply.degraded,
-        tokens={"input": reply.input_tokens, "output": reply.output_tokens},
+        cache_hit=cache_hit,
+        route=route,
+        tokens={"input": 0 if cache_hit else reply.input_tokens,
+                "output": 0 if cache_hit else reply.output_tokens},
     )
 
 
@@ -87,14 +140,43 @@ def ask_stream():
         except Exception:
             return jsonify(error="image 不是合法的 base64"), 400
 
+    t0 = time.monotonic()
+    h = _frame_hash(image_b64)
+    turn_type = "image" if image_b64 else "text"
+
     def gen():
+        cached = _cache.get(h, question) if image_b64 else None
+        if cached is not None:                       # 命中缓存:复用文本,零云调用
+            for i in range(0, len(cached.text), 12):
+                yield _sse({"type": "delta", "text": cached.text[i:i + 12]})
+            yield _sse({"type": "done", "source": cached.source, "cache_hit": True,
+                        "input_tokens": 0, "output_tokens": 0})
+            _cache.mark(h)
+            _record(turn_type, "cache", cached, True, t0)
+            return
+
+        acc, src, in_tok, out_tok = "", "mock", 0, 0
         try:
             for ev in get_service().vision_chat_stream(
                     question, image_b64=image_b64, media_type=media_type):
-                yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
-        except Exception as e:  # 流中异常也以事件形式收尾,前端不挂死
+                if ev["type"] == "delta":
+                    acc += ev["text"]
+                elif ev["type"] == "done":
+                    src = ev.get("source", "mock")
+                    in_tok = ev.get("input_tokens", 0)
+                    out_tok = ev.get("output_tokens", 0)
+                yield _sse(ev)
+        except Exception as e:  # 流中异常以事件收尾,前端不挂死
             log.warning("ask_stream 异常:%s", e)
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            yield _sse({"type": "error", "message": str(e)})
+            return
+
+        reply = VisionReply(text=acc, source=src, input_tokens=in_tok,
+                            output_tokens=out_tok, degraded=(src == "mock"))
+        if image_b64 and src == "minimax":
+            _cache.put(h, question, reply)
+        _cache.mark(h)
+        _record(turn_type, "image" if image_b64 else "text", reply, False, t0)
 
     return Response(gen(), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
@@ -112,7 +194,9 @@ def asr():
         return jsonify(error="服务端 ASR 未配置,请用浏览器 Web Speech"), 503
     except Exception as e:
         log.warning("ASR 失败:%s", e)
+        metrics.get_store().track("asr_fail", {"bytes": len(pcm)})
         return jsonify(error="识别失败"), 502
+    metrics.get_store().track("asr_success", {"bytes": len(pcm)})
     return jsonify(text=text)
 
 

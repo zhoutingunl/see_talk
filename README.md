@@ -21,7 +21,14 @@
 - ✅ **ASR 分层**:桌面浏览器 Web Speech(免费)/ 移动端百炼 Paraformer(`/api/asr` 代理,Key 仅在服务端)
 - ✅ **流式回答 + 首句优先 TTS**:`/api/ask_stream`(SSE)边收边播(`static/tts.js`)
 - ✅ 真机验证:M3 流式 SSE 实时输出;百炼 ASR 语音往返(合成「你好,这是语音识别测试」→ 准确转写)
-- ⏭ 成本 Dashboard、OCR 优先路由、连续分析模式 → 后续 PR
+
+### PR3 · 成本控制 + Dashboard
+- ✅ **视觉缓存 + 变化检测**:感知哈希(average hash),同画面同问命中缓存、零云调用(`vision_cache.py`)
+- ✅ **token 实测对账**:每轮记 实际 token vs Baseline(朴素每轮整图),算节省率(`metrics.py`,SQLite)
+- ✅ **延迟分桶**(纯文本 / 带图 P50/P95)+ **埋点 EventLog**
+- ✅ **Dashboard**:`/dashboard` 实时展示轮数 / 节省率 / 命中率 / 成本估算 / 延迟
+- ✅ 真机验证:同图同问第二次命中缓存(token 0)、实测节省率 95.4%
+- ⏭ OCR 优先路由、连续分析模式、百炼高音质 TTS → 后续 PR
 
 ## 运行
 
@@ -42,7 +49,7 @@ python3.11 app.py             # http://localhost:8000
 python3.11 -m pytest -q --cov=. --cov-report=term-missing
 ```
 
-**实测(本机 Python 3.11):39 passed,覆盖率 96%。**
+**实测(本机 Python 3.11):59 passed,覆盖率 97%。**
 策略遵循 design.md §22:Mock 云(MiniMax/百炼),只测确定性逻辑(载荷构造、响应解析、
 降级、入参校验、图片解析),不测非确定性的 AI 答案本身。未覆盖部分为 gevent 启动入口
 与需真实 Key 的初始化分支。
@@ -51,14 +58,18 @@ python3.11 -m pytest -q --cov=. --cov-report=term-missing
 
 ```
 see_talk/
-  app.py            Flask 入口 + /api/ask 闭环
+  app.py            Flask 入口:/api/ask · /api/ask_stream(SSE)· /api/asr · /dashboard
   config.py         env/.env 配置 + PlanConfig 档位
+  vision_cache.py   感知哈希:视觉缓存 + 变化检测(省钱核心)
+  metrics.py        SQLite:token 对账 / 节省率 / 延迟分桶 / 埋点
   ai/
     service.py      AIService 统一入口(降级编排)
-    minimax.py      MiniMax-M3 多模态客户端(Anthropic /v1/messages)
+    minimax.py      MiniMax-M3 多模态客户端(非流式 + 流式)
+    bailian.py      百炼 Paraformer 实时 ASR(DashScope WS)
     mock.py         无 Key 降级层
     types.py        ChatMessage / VisionReply
-  templates/index.html  static/app.js  static/style.css
+  templates/        index.html · dashboard.html
+  static/           app.js · voice.js(VAD+ASR)· tts.js(首句优先)· style.css
   tests/            pytest(Mock 云,确定性)
 ```
 

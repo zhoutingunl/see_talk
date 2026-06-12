@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SeeTalk · Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <h1>SeeTalk Dashboard</h1>
+    <span class="sub">成本 / QoS 实测对账（design.md §15）</span>
+    <a class="badge live" href="/">← 返回</a>
+  </header>
+
+  <main class="dash">
+    <div class="cards" id="cards"></div>
+    <p class="hint" id="updated"></p>
+  </main>
+
+  <script>
+    const CNY = (n) => '¥' + Number(n).toFixed(4);
+    const PCT = (n) => (Number(n) * 100).toFixed(1) + '%';
+
+    function card(title, value, sub) {
+      return `<div class="card stat"><div class="k">${title}</div>`
+        + `<div class="v">${value}</div>`
+        + (sub ? `<div class="s">${sub}</div>` : '') + '</div>';
+    }
+
+    async function load() {
+      const m = await (await fetch('/api/metrics')).json();
+      const lat = m.latency_ms || {};
+      const fmtLat = (t) => lat[t] ? `P50 ${lat[t].p50}ms · P95 ${lat[t].p95}ms (n=${lat[t].n})` : '—';
+      document.getElementById('cards').innerHTML = [
+        card('对话轮数', m.turns),
+        card('节省率', PCT(m.savings_rate),
+             `实际 ${m.actual_input_tokens} / Baseline ${m.baseline_input_tokens} input token`),
+        card('缓存命中率', PCT(m.cache_hit_rate), `${m.cache_hits} 次命中`),
+        card('输出 token', m.output_tokens),
+        card('成本估算', CNY(m.cost_estimate_cny), '单价为占位估算'),
+        card('纯文本延迟', fmtLat('text')),
+        card('带图延迟', fmtLat('image')),
+        card('埋点事件', m.events),
+      ].join('');
+      document.getElementById('updated').textContent = '自动刷新中（每 3s）';
+    }
+    load();
+    setInterval(load, 3000);
+  </script>
+</body>
+</html>
