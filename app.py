@@ -14,6 +14,7 @@ import time
 from flask import Flask, Response, jsonify, render_template, request
 
 import config
+import experiments
 import metrics
 import ocr_service
 import vision_cache
@@ -47,15 +48,17 @@ def _frame_hash(image_b64: str | None) -> int:
     return vision_cache.average_hash(image_b64) if image_b64 else 0
 
 
-def _route_vision(question: str, image_b64: str | None) -> tuple[str, str | None, str]:
+def _route_vision(question: str, image_b64: str | None,
+                  ocr_on: bool = True) -> tuple[str, str | None, str]:
     """OCR 优先路由(design.md §14)。返回 (发送用问题, 发送用图, route)。
 
     文本场景:本地 OCR 出文本 → 只发文本省掉整图 token;否则发图。
+    ocr_on=False(A/B off 组)时跳过 OCR 路由,始终发图。
     """
     if not image_b64:
         return question, None, "text"
     ocr = ocr_service.get_ocr()
-    if not ocr.enabled:
+    if not ocr_on or not ocr.enabled:
         return question, image_b64, "image"
     text, conf, nchars = ocr.extract(image_b64)
     if ocr.is_text_scene(text, conf, nchars):
@@ -66,16 +69,24 @@ def _route_vision(question: str, image_b64: str | None) -> tuple[str, str | None
 
 
 def _record(turn_type: str, route: str, reply: VisionReply,
-            cache_hit: bool, t0: float) -> None:
+            cache_hit: bool, t0: float, *, session_id: str = "",
+            variant: str = "") -> None:
     store = metrics.get_store()
     store.record_turn(
         turn_type=turn_type, route=route, source=reply.source, cache_hit=cache_hit,
         input_tokens=0 if cache_hit else reply.input_tokens,
         output_tokens=0 if cache_hit else reply.output_tokens,
-        latency_ms=(time.monotonic() - t0) * 1000)
+        latency_ms=(time.monotonic() - t0) * 1000,
+        session_id=session_id, variant=variant)
     store.track("cache_hit" if cache_hit else
                 ("vision_success" if reply.source == "minimax" else "vision_mock"),
                 {"route": route})
+
+
+def _ab(payload: dict) -> tuple[str, str]:
+    """取 session_id 并分配 ocr_first 变体。返回 (session_id, variant)。"""
+    sid = (payload.get("session_id") or "anon").strip() or "anon"
+    return sid, experiments.assign(sid, "ocr_first")
 
 
 def _sse(ev: dict) -> str:
@@ -95,6 +106,17 @@ def dashboard():
 @app.get("/api/metrics")
 def api_metrics():
     return jsonify(metrics.get_store().summary())
+
+
+@app.get("/api/experiments")
+def api_experiments():
+    """A/B 实验定义 + 某 session 的分配 + 各变体实测对比(design.md §18)。"""
+    sid = (request.args.get("session_id") or "anon").strip() or "anon"
+    return jsonify(
+        experiments=experiments.EXPERIMENTS,
+        assignment=experiments.all_assignments(sid),
+        results=metrics.get_store().summary().get("ab", {}),
+    )
 
 
 @app.get("/api/health")
@@ -120,6 +142,7 @@ def ask():
         except Exception:
             return jsonify(error="image 不是合法的 base64"), 400
 
+    sid, variant = _ab(payload)
     t0 = time.monotonic()
     h = _frame_hash(image_b64)
     turn_type = "image" if image_b64 else "text"
@@ -127,14 +150,14 @@ def ask():
     if cached is not None:
         reply, cache_hit, route = cached, True, "cache"
     else:
-        q_send, img_send, route = _route_vision(question, image_b64)
+        q_send, img_send, route = _route_vision(question, image_b64, variant != "off")
         reply = get_service().vision_chat(
             q_send, image_b64=img_send, media_type=media_type)
         cache_hit = False
         if image_b64 and reply.source == "minimax":
             _cache.put(h, question, reply)
     _cache.mark(h)
-    _record(turn_type, route, reply, cache_hit, t0)
+    _record(turn_type, route, reply, cache_hit, t0, session_id=sid, variant=variant)
     return jsonify(
         answer=reply.text,
         source=reply.source,
@@ -160,6 +183,7 @@ def ask_stream():
         except Exception:
             return jsonify(error="image 不是合法的 base64"), 400
 
+    sid, variant = _ab(payload)
     t0 = time.monotonic()
     h = _frame_hash(image_b64)
     turn_type = "image" if image_b64 else "text"
@@ -172,10 +196,10 @@ def ask_stream():
             yield _sse({"type": "done", "source": cached.source, "cache_hit": True,
                         "input_tokens": 0, "output_tokens": 0})
             _cache.mark(h)
-            _record(turn_type, "cache", cached, True, t0)
+            _record(turn_type, "cache", cached, True, t0, session_id=sid, variant=variant)
             return
 
-        q_send, img_send, route = _route_vision(question, image_b64)
+        q_send, img_send, route = _route_vision(question, image_b64, variant != "off")
         acc, src, in_tok, out_tok = "", "mock", 0, 0
         try:
             for ev in get_service().vision_chat_stream(
@@ -197,7 +221,7 @@ def ask_stream():
         if image_b64 and src == "minimax":
             _cache.put(h, question, reply)
         _cache.mark(h)
-        _record(turn_type, route, reply, False, t0)
+        _record(turn_type, route, reply, False, t0, session_id=sid, variant=variant)
 
     return Response(gen(), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})

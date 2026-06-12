@@ -134,3 +134,11 @@ def test_route_disabled_ocr_sends_image(monkeypatch):
     monkeypatch.setattr(ocr_service, "_ocr", FakeOcr(enabled=False))
     q, img, route = app_module._route_vision("问", "imgdata")
     assert route == "image" and img == "imgdata"
+
+
+def test_route_ab_off_variant_skips_ocr(monkeypatch):
+    """A/B off 组:即使是文本场景也跳过 OCR、始终发图(design.md §18)。"""
+    monkeypatch.setattr(ocr_service, "_ocr",
+                        FakeOcr(text="lots of text here", nchars=20, text_scene=True))
+    q, img, route = app_module._route_vision("问", "imgdata", ocr_on=False)
+    assert route == "image" and img == "imgdata"

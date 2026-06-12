@@ -40,7 +40,12 @@
 - ✅ `/api/tts`(text → mp3);前端 TTS 双模式可切:浏览器(免费默认)/ 百炼高音质(付费档)
 - ✅ 首句优先沿用:逐句合成播放;百炼不可用自动回退浏览器
 - ✅ 真机验证:`cosyvoice-v2 + longxiaochun_v2` 合成 22050Hz 合法 MP3
-- ⏭ 连续分析模式、A/B 实验框架、评估框架 → 后续 PR
+### PR7 · A/B 实验框架(§18)
+- ✅ **确定性分桶**:按 session_id 哈希分配变体(同用户恒定),`experiments.py`
+- ✅ 首个实验 `ocr_first`(on/off):量化"OCR 只发文本省 token vs 误判风险"
+- ✅ metrics 记录变体 + 按变体对比节省率/延迟;`/api/experiments` 看分配与对比
+- ✅ 前端 localStorage 稳定 session_id;真机验证 on/off 分桶 + 对比落库
+- ⏭ 连续分析模式、评估框架 → 后续 PR
 
 ## 运行
 
@@ -64,7 +69,7 @@ python3.11 app.py             # http://localhost:8000
 python3.11 -m pytest -q --cov=. --cov-report=term-missing
 ```
 
-**实测(本机 Python 3.11):79 passed,覆盖率 96%。**
+**实测(本机 Python 3.11):89 passed,覆盖率 96%。**
 策略遵循 design.md §22:Mock 云(MiniMax/百炼),只测确定性逻辑(载荷构造、响应解析、
 降级、入参校验、图片解析),不测非确定性的 AI 答案本身。未覆盖部分为 gevent 启动入口
 与需真实 Key 的初始化分支。
@@ -78,6 +83,7 @@ see_talk/
   vision_cache.py   感知哈希:视觉缓存 + 变化检测(省钱核心)
   metrics.py        SQLite:token 对账 / 节省率 / 延迟分桶 / 埋点
   ocr_service.py    本地 Tesseract OCR(OCR 优先路由)
+  experiments.py    A/B 实验:确定性分桶 + 变体对比
   ai/
     service.py      AIService 统一入口(降级编排)
     minimax.py      MiniMax-M3 多模态客户端(非流式 + 流式)
