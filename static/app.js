@@ -174,5 +174,56 @@ ttsToggle.addEventListener('click', () => {
   }
 });
 
+// ---------- 连续分析模式（会议辅助，design.md §5/§12）----------
+const contBtn = document.getElementById('contBtn');
+const summaryBtn = document.getElementById('summaryBtn');
+const obsLog = document.getElementById('obsLog');
+let contTimer = null;
+
+function obsLine(text, cls) {
+  const d = document.createElement('div');
+  d.className = 'obs ' + (cls || '');
+  d.textContent = text;
+  obsLog.appendChild(d);
+  obsLog.scrollTop = obsLog.scrollHeight;
+}
+
+async function observeOnce() {
+  const image = grabFrame();
+  if (!image) return;
+  try {
+    const j = await (await fetch('/api/observe', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image, session_id: SID }),
+    })).json();
+    if (!j.skipped && j.text) obsLine('👁 ' + j.text);
+  } catch (e) { /* 忽略单次失败，继续 */ }
+}
+
+contBtn.addEventListener('click', () => {
+  if (contTimer) {
+    clearInterval(contTimer); contTimer = null;
+    contBtn.textContent = '▶ 连续分析（会议辅助）';
+    contBtn.classList.remove('on');
+  } else {
+    if (!stream) { obsLine('请先开启摄像头', 'err'); return; }
+    contBtn.textContent = '⏹ 停止连续分析';
+    contBtn.classList.add('on');
+    observeOnce();
+    contTimer = setInterval(observeOnce, 4000);   // 每 4s 一帧（design.md §12）
+  }
+});
+
+summaryBtn.addEventListener('click', async () => {
+  obsLine('正在生成纪要…', 'muted');
+  try {
+    const j = await (await fetch('/api/summary', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: SID }),
+    })).json();
+    obsLine('📝 纪要（基于 ' + j.n + ' 条观察）：' + j.summary, 'summary');
+  } catch (e) { obsLine('生成纪要失败', 'err'); }
+});
+
 asrToggle.textContent = 'ASR：' + voice.providerLabel;
 refreshHealth();
