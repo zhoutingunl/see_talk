@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from ai.service import AIService, ASRUnavailable
+from ai.service import AIService, ASRUnavailable, TTSUnavailable
 
 
 def test_asr_unavailable_when_no_bailian():
@@ -28,3 +28,22 @@ def test_transcribe_delegates_to_bailian():
     assert svc.asr_live is True
     assert svc.transcribe(b"abc") == "识别结果"
     assert svc._bailian.got == b"abc"
+
+
+def test_tts_unavailable_when_no_bailian():
+    svc = AIService()
+    svc._bailian_tts = None
+    assert svc.tts_live is False
+    with pytest.raises(TTSUnavailable):
+        svc.synthesize("你好")
+
+
+def test_synthesize_delegates_to_bailian_tts():
+    class FakeTTS:
+        def synthesize(self, text):
+            return b"AUDIO:" + text.encode()
+
+    svc = AIService()
+    svc._bailian_tts = FakeTTS()
+    assert svc.tts_live is True
+    assert svc.synthesize("hi") == b"AUDIO:hi"

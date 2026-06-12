@@ -14,6 +14,7 @@ def client(monkeypatch):
     svc = app_module.get_service()
     monkeypatch.setattr(svc, "_minimax", None)  # 强制 Mock 流
     monkeypatch.setattr(svc, "_bailian", None)
+    monkeypatch.setattr(svc, "_bailian_tts", None)
     app_module.app.config.update(TESTING=True)
     return app_module.app.test_client()
 
@@ -75,3 +76,28 @@ def test_asr_happy_path_with_fake_bailian(client, monkeypatch):
                     content_type="application/octet-stream")
     assert r.status_code == 200
     assert r.get_json()["text"] == "你好世界"
+
+
+def test_health_includes_tts_live(client):
+    assert client.get("/api/health").get_json()["tts_live"] is False
+
+
+def test_tts_requires_text(client):
+    assert client.post("/api/tts", json={"text": " "}).status_code == 400
+
+
+def test_tts_unconfigured_returns_503(client):
+    assert client.post("/api/tts", json={"text": "你好"}).status_code == 503
+
+
+def test_tts_happy_path_returns_audio(client, monkeypatch):
+    class FakeTTS:
+        def synthesize(self, text):
+            return b"\xff\xfbMP3DATA"
+
+    svc = app_module.get_service()
+    monkeypatch.setattr(svc, "_bailian_tts", FakeTTS())
+    r = client.post("/api/tts", json={"text": "你好"})
+    assert r.status_code == 200
+    assert r.mimetype == "audio/mpeg"
+    assert r.data == b"\xff\xfbMP3DATA"
