@@ -28,7 +28,13 @@
 - ✅ **延迟分桶**(纯文本 / 带图 P50/P95)+ **埋点 EventLog**
 - ✅ **Dashboard**:`/dashboard` 实时展示轮数 / 节省率 / 命中率 / 成本估算 / 延迟
 - ✅ 真机验证:同图同问第二次命中缓存(token 0)、实测节省率 95.4%
-- ⏭ OCR 优先路由、连续分析模式、百炼高音质 TTS → 后续 PR
+
+### PR4 · OCR 优先路由
+- ✅ **本地 Tesseract OCR**:纯文本场景(报错/英文/代码)先本地 OCR → 只发文本给 M3,省掉整图 token(`ocr_service.py`)
+- ✅ 路由判定:字符数 + 置信度阈值;非文本场景仍发降分图;无 tesseract 自动退化为发图
+- ✅ Dashboard 新增**路由分布**(ocr/image/cache)
+- ✅ 真机验证:英文报错图 → `route=ocr`,input token 72(发图需数百),M3 正确解释 TypeError
+- ⏭ 连续分析模式、百炼高音质 TTS、A/B 实验框架 → 后续 PR
 
 ## 运行
 
@@ -49,7 +55,7 @@ python3.11 app.py             # http://localhost:8000
 python3.11 -m pytest -q --cov=. --cov-report=term-missing
 ```
 
-**实测(本机 Python 3.11):59 passed,覆盖率 97%。**
+**实测(本机 Python 3.11):66 passed,覆盖率 96%。**
 策略遵循 design.md §22:Mock 云(MiniMax/百炼),只测确定性逻辑(载荷构造、响应解析、
 降级、入参校验、图片解析),不测非确定性的 AI 答案本身。未覆盖部分为 gevent 启动入口
 与需真实 Key 的初始化分支。
@@ -62,6 +68,7 @@ see_talk/
   config.py         env/.env 配置 + PlanConfig 档位
   vision_cache.py   感知哈希:视觉缓存 + 变化检测(省钱核心)
   metrics.py        SQLite:token 对账 / 节省率 / 延迟分桶 / 埋点
+  ocr_service.py    本地 Tesseract OCR(OCR 优先路由)
   ai/
     service.py      AIService 统一入口(降级编排)
     minimax.py      MiniMax-M3 多模态客户端(非流式 + 流式)

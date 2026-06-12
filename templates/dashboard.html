@@ -32,6 +32,9 @@
       const m = await (await fetch('/api/metrics')).json();
       const lat = m.latency_ms || {};
       const fmtLat = (t) => lat[t] ? `P50 ${lat[t].p50}ms · P95 ${lat[t].p95}ms (n=${lat[t].n})` : '—';
+      const routes = m.routes || {};
+      const fmtRoutes = Object.keys(routes).length
+        ? Object.entries(routes).map(([k, v]) => `${k}:${v}`).join(' · ') : '—';
       document.getElementById('cards').innerHTML = [
         card('对话轮数', m.turns),
         card('节省率', PCT(m.savings_rate),
@@ -41,6 +44,7 @@
         card('成本估算', CNY(m.cost_estimate_cny), '单价为占位估算'),
         card('纯文本延迟', fmtLat('text')),
         card('带图延迟', fmtLat('image')),
+        card('路由分布', fmtRoutes, 'ocr=只发文本 · image=发图 · cache=命中'),
         card('埋点事件', m.events),
       ].join('');
       document.getElementById('updated').textContent = '自动刷新中（每 3s）';

@@ -15,6 +15,7 @@ from flask import Flask, Response, jsonify, render_template, request
 
 import config
 import metrics
+import ocr_service
 import vision_cache
 from ai import get_service
 from ai.service import ASRUnavailable
@@ -44,6 +45,24 @@ def _parse_image(raw: str | None) -> tuple[str | None, str]:
 
 def _frame_hash(image_b64: str | None) -> int:
     return vision_cache.average_hash(image_b64) if image_b64 else 0
+
+
+def _route_vision(question: str, image_b64: str | None) -> tuple[str, str | None, str]:
+    """OCR 优先路由(design.md §14)。返回 (发送用问题, 发送用图, route)。
+
+    文本场景:本地 OCR 出文本 → 只发文本省掉整图 token;否则发图。
+    """
+    if not image_b64:
+        return question, None, "text"
+    ocr = ocr_service.get_ocr()
+    if not ocr.enabled:
+        return question, image_b64, "image"
+    text, conf, nchars = ocr.extract(image_b64)
+    if ocr.is_text_scene(text, conf, nchars):
+        metrics.get_store().track("ocr_route", {"chars": nchars, "conf": conf})
+        aug = f"{question}\n\n[画面识别到的文字]:\n{text}"
+        return aug, None, "ocr"
+    return question, image_b64, "image"
 
 
 def _record(turn_type: str, route: str, reply: VisionReply,
@@ -108,9 +127,10 @@ def ask():
     if cached is not None:
         reply, cache_hit, route = cached, True, "cache"
     else:
+        q_send, img_send, route = _route_vision(question, image_b64)
         reply = get_service().vision_chat(
-            question, image_b64=image_b64, media_type=media_type)
-        cache_hit, route = False, ("image" if image_b64 else "text")
+            q_send, image_b64=img_send, media_type=media_type)
+        cache_hit = False
         if image_b64 and reply.source == "minimax":
             _cache.put(h, question, reply)
     _cache.mark(h)
@@ -155,10 +175,11 @@ def ask_stream():
             _record(turn_type, "cache", cached, True, t0)
             return
 
+        q_send, img_send, route = _route_vision(question, image_b64)
         acc, src, in_tok, out_tok = "", "mock", 0, 0
         try:
             for ev in get_service().vision_chat_stream(
-                    question, image_b64=image_b64, media_type=media_type):
+                    q_send, image_b64=img_send, media_type=media_type):
                 if ev["type"] == "delta":
                     acc += ev["text"]
                 elif ev["type"] == "done":
@@ -176,7 +197,7 @@ def ask_stream():
         if image_b64 and src == "minimax":
             _cache.put(h, question, reply)
         _cache.mark(h)
-        _record(turn_type, "image" if image_b64 else "text", reply, False, t0)
+        _record(turn_type, route, reply, False, t0)
 
     return Response(gen(), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
