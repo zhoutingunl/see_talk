@@ -18,7 +18,7 @@ python3.11 app.py                     # 打开 http://localhost:8000
 SEETALK_HTTPS=1 python3.11 app.py     # Android Studio 打开 android/ 一键 Run,填 https://<电脑IP>:8000
 
 # 测试
-python3.11 -m pytest -q               # 实测 105 passed,覆盖率 96%
+python3.11 -m pytest -q               # 110 passed 96%(无 chi_sim 中文包则 108 passed + 2 skipped)
 ```
 
 **已真机验证(非 Mock,用真实 Key)**:M3 多模态看图/流式回答 · 百炼 Paraformer 语音往返 ·
@@ -87,7 +87,8 @@ ASR 为小头(按时长、VAD 门控);桌面 ASR/TTS、OCR、缓存、变化检�
 ## 4. 工程与质量(引用,不重复)
 
 - **演进**:20 个 PR(中文 `[feat]/[fix]` 前缀),逐个真机验证后合入,见仓库 PR 历史。
-- **测试**:105 passed,覆盖率 96%。策略=Mock 云 + 确定性逻辑(`README.md` 测试节)。
+- **测试**:110 passed,覆盖率 96%(未装 chi_sim 中文包则 108 passed + 2 skipped)。策略=Mock 云 + 确定性逻辑(`README.md` 测试节)。
+- **作者署名**:同一作者(git 本地名 `zhouting03` / GitHub 账号 `zhoutingunl`,同一人;邮箱不同不构成多人),AI 协作见 design.md §27,提交均含 Claude co-author。
 - **安全/隐私**:密钥仅服务端 `.env`(已 gitignore,全历史扫描无泄漏);按需抓帧 + 默认不落盘原始媒体(`design.md §25`)。
 - **手机端**:`android/` WebView 套壳,补齐摄像头/麦克风权限 + 自签 HTTPS(`android/README.md`)。
 

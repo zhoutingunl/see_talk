@@ -42,6 +42,7 @@
 - **免手 VAD** 断句(静音 1.2s,过短碎片丢弃,避免一句被切两段);用户开口即**打断**当前播报。
 - **ASR**:中文默认百炼 Paraformer(准),桌面可切免费浏览器 Web Speech;移动端统一百炼(`/api/asr` 代理,Key 仅服务端)。
 - **流式回答 + 首句优先 TTS**:`/api/ask_stream`(SSE)边收边播;TTS 浏览器免费 / 百炼 CosyVoice 高音质,可切。
+- **多轮上下文**:`session_store.py` 按会话维护最近 N 轮文本历史并注入每次调用,支持"它/那个/刚才"指代消解(历史只存文本、不回传旧图,省 token)。
 
 **成本控制(实测对账)**
 - 省钱杠杆:按需触发 + 变化检测 + 视觉缓存 + 短上下文(默认10轮文本+当前1帧)+ 图像降分 + OCR优先 + VAD门控。
@@ -87,7 +88,8 @@ python3.11 app.py             # http://localhost:8000
 python3.11 -m pytest -q --cov=. --cov-report=term-missing
 ```
 
-**实测(本机 Python 3.11):105 passed,覆盖率 96%。**
+**实测(本机 Python 3.11):110 passed,覆盖率 96%。**
+未装 `chi_sim` 中文包的环境,2 项中文 OCR 用例会自动 skip(即 108 passed + 2 skipped),属预期。
 策略遵循 design.md §22:Mock 云(MiniMax/百炼),只测确定性逻辑(载荷构造、响应解析、
 降级、入参校验、图片解析),不测非确定性的 AI 答案本身。未覆盖部分为 gevent 启动入口
 与需真实 Key 的初始化分支。
@@ -101,6 +103,7 @@ see_talk/
   vision_cache.py   感知哈希:视觉缓存 + 变化检测(省钱核心)
   metrics.py        SQLite:token 对账 / 节省率 / 延迟分桶 / 埋点
   ocr_service.py    本地 Tesseract OCR(OCR 优先路由)
+  session_store.py  会话多轮上下文(最近 N 轮文本历史,注入到每次调用)
   experiments.py    A/B 实验:确定性分桶 + 变体对比
   evaluation.py     评估框架:OCR 准确率 + 对话成功率
   observations.py   连续分析:观察累积 + 变化检测 + 纪要汇总
