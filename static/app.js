@@ -59,11 +59,21 @@ const INSECURE_HINT = '当前页面非安全上下文，浏览器禁用了摄像
   + '请用 http://localhost:8000 访问；手机/局域网请改用 https（设 SEETALK_HTTPS=1 启动）。';
 
 // ---------- 摄像头 ----------
+let facing = 'environment';   // 默认请求后置(看世界);笔记本只有前置会自动回退
+const flipBtn = document.getElementById('flipBtn');
+
+async function openCamera() {
+  if (stream) stream.getTracks().forEach((t) => t.stop());
+  stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: { ideal: facing } }, audio: false,
+  });
+  video.srcObject = stream;
+}
+
 startCam.addEventListener('click', async () => {
   if (!mediaSupported()) { addLine('系统', INSECURE_HINT, 'err'); return; }
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-    video.srcObject = stream;
+    await openCamera();
     startCam.disabled = true; stopCam.disabled = false;
   } catch (e) { addLine('系统', '无法打开摄像头：' + e.message, 'err'); }
 });
@@ -71,6 +81,14 @@ stopCam.addEventListener('click', () => {
   if (stream) stream.getTracks().forEach((t) => t.stop());
   stream = null; video.srcObject = null;
   startCam.disabled = false; stopCam.disabled = true;
+});
+flipBtn.addEventListener('click', async () => {
+  facing = facing === 'user' ? 'environment' : 'user';
+  flipBtn.textContent = facing === 'user' ? '切到后置' : '切到前置';
+  if (stream) {
+    try { await openCamera(); }
+    catch (e) { addLine('系统', '切换摄像头失败：' + e.message, 'err'); }
+  }
 });
 
 // 抓当前帧 → 降分到宽 512(design.md §14)→ jpeg dataURL
