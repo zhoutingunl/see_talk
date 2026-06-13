@@ -114,6 +114,16 @@ _ANSWER_SYSTEM = (
     "不要描述「用户正在拍摄/举着手机/对着镜头/把东西举在脸前」这类与提问无关的动作。"
 )
 
+# 语音输入:让 M3 顺手纠正 ASR 同音/识别错误,不额外加调用(省钱)
+_ASR_HINT = (
+    "用户的问题来自语音识别,可能有同音字或识别错误(例如「这是」被听成「喝水就是」)。"
+    "请结合画面与常识理解用户的真实意图后再回答,不要纠结字面文字。"
+)
+
+
+def _answer_system(payload: dict) -> str:
+    return _ANSWER_SYSTEM + (_ASR_HINT if payload.get("voice") else "")
+
 
 @app.get("/")
 def index():
@@ -174,7 +184,8 @@ def ask():
     else:
         q_send, img_send, route = _route_vision(question, image_b64, variant != "off")
         reply = get_service().vision_chat(
-            q_send, image_b64=img_send, media_type=media_type, system=_ANSWER_SYSTEM)
+            q_send, image_b64=img_send, media_type=media_type,
+            system=_answer_system(payload))
         cache_hit = False
         if image_b64 and reply.source == "minimax":
             _cache.put(h, question, reply)
@@ -226,7 +237,7 @@ def ask_stream():
         try:
             for ev in get_service().vision_chat_stream(
                     q_send, image_b64=img_send, media_type=media_type,
-                    system=_ANSWER_SYSTEM):
+                    system=_answer_system(payload)):
                 if ev["type"] == "delta":
                     acc += ev["text"]
                 elif ev["type"] == "done":
