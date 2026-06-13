@@ -1,7 +1,9 @@
 # SeeTalk · AI 视觉对话助手
 
 实时多模态 AI 对话助手:打开摄像头与麦克风,让 AI 看见环境、听见用户、自然回应。
-完整设计见 [`design.md`](./design.md)。
+
+> 📋 **评审先看这里**:[`SUBMISSION.md`](./SUBMISSION.md) —— 提交说明/评审导览,含题目要求的两份交付物(用户故事 计划 vs 实现、成本控制 想到 vs 采用)。
+> 完整设计见 [`design.md`](./design.md)。
 
 ## 架构一句话
 
