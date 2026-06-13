@@ -32,6 +32,7 @@ import experiments
 import metrics
 import observations
 import ocr_service
+import session_store
 import vision_cache
 from ai import get_service
 from ai.service import ASRUnavailable, TTSUnavailable
@@ -178,6 +179,7 @@ def ask():
             return jsonify(error="image 不是合法的 base64"), 400
 
     sid, variant = _ab(payload)
+    history = session_store.get_store().history(sid)   # 多轮上下文(design.md §11)
     t0 = time.monotonic()
     h = _frame_hash(image_b64)
     turn_type = "image" if image_b64 else "text"
@@ -188,12 +190,13 @@ def ask():
         q_send, img_send, route = _route_vision(question, image_b64, variant != "off")
         reply = get_service().vision_chat(
             q_send, image_b64=img_send, media_type=media_type,
-            system=_answer_system(payload))
+            system=_answer_system(payload), history=history)
         cache_hit = False
         if image_b64 and reply.source == "minimax":
             _cache.put(h, question, reply)
     _cache.mark(h)
     _record(turn_type, route, reply, cache_hit, t0, session_id=sid, variant=variant)
+    session_store.get_store().append(sid, question, reply.text)
     return jsonify(
         answer=reply.text,
         source=reply.source,
@@ -220,6 +223,7 @@ def ask_stream():
             return jsonify(error="image 不是合法的 base64"), 400
 
     sid, variant = _ab(payload)
+    history = session_store.get_store().history(sid)   # 多轮上下文(design.md §11)
     t0 = time.monotonic()
     h = _frame_hash(image_b64)
     turn_type = "image" if image_b64 else "text"
@@ -233,6 +237,7 @@ def ask_stream():
                         "input_tokens": 0, "output_tokens": 0})
             _cache.mark(h)
             _record(turn_type, "cache", cached, True, t0, session_id=sid, variant=variant)
+            session_store.get_store().append(sid, question, cached.text)
             return
 
         q_send, img_send, route = _route_vision(question, image_b64, variant != "off")
@@ -240,7 +245,7 @@ def ask_stream():
         try:
             for ev in get_service().vision_chat_stream(
                     q_send, image_b64=img_send, media_type=media_type,
-                    system=_answer_system(payload)):
+                    system=_answer_system(payload), history=history):
                 if ev["type"] == "delta":
                     acc += ev["text"]
                 elif ev["type"] == "done":
@@ -259,6 +264,8 @@ def ask_stream():
             _cache.put(h, question, reply)
         _cache.mark(h)
         _record(turn_type, route, reply, False, t0, session_id=sid, variant=variant)
+        if acc:
+            session_store.get_store().append(sid, question, acc)
 
     return Response(gen(), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
@@ -350,6 +357,7 @@ def observe_clear():
     payload = request.get_json(silent=True) or {}
     sid = (payload.get("session_id") or "anon").strip() or "anon"
     observations.get_store().clear(sid)
+    session_store.get_store().clear(sid)   # 一并清多轮上下文
     return jsonify(ok=True)
 
 
