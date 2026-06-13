@@ -43,6 +43,11 @@ async function refreshHealth() {
     badge.classList.toggle('live', j.vision_live);
     window.__asrLive = j.asr_live;
     window.__ttsLive = j.tts_live;
+    // 配了百炼就默认用它:中文识别远胜浏览器 Web Speech(后者中文易出同音错)
+    if (j.asr_live && !voice.active && voice.provider !== 'bailian') {
+      voice.setProvider('bailian');
+      asrToggle.textContent = 'ASR：' + voice.providerLabel;
+    }
   } catch { badge.textContent = '后端不可达'; }
 }
 
@@ -79,7 +84,7 @@ function grabFrame() {
 }
 
 // ---------- 流式问答(文字 / 语音共用)----------
-async function ask(question) {
+async function ask(question, fromVoice = false) {
   const image = grabFrame();
   addLine('我', question + (image ? ' 📷' : ''), 'me');
   const pending = addLine('AI', '', 'ai');
@@ -92,7 +97,7 @@ async function ask(question) {
     const r = await fetch('/api/ask_stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question, image, session_id: SID }),
+      body: JSON.stringify({ question, image, session_id: SID, voice: fromVoice }),
     });
     if (!r.ok) { txt.textContent = '错误：HTTP ' + r.status; pending.classList.add('err'); return; }
 
@@ -143,7 +148,7 @@ askForm.addEventListener('submit', (ev) => {
 });
 
 // ---------- 语音提问 ----------
-function handleUtterance(text) { ask(text); }
+function handleUtterance(text) { ask(text, true); }   // 语音来源 → 启用 ASR 纠错提示
 
 function setVoiceState(state) {
   const map = {

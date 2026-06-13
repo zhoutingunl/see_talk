@@ -57,6 +57,14 @@ def test_ask_works_without_image(client):
     assert r.get_json()["answer"]
 
 
+def test_answer_system_adds_asr_hint_only_for_voice():
+    assert "语音识别" in app_module._answer_system({"voice": True})
+    assert "语音识别" not in app_module._answer_system({"voice": False})
+    assert "语音识别" not in app_module._answer_system({})
+    # 两种情况都保留基础约束
+    assert "实时视觉对话助手" in app_module._answer_system({"voice": True})
+
+
 def test_ensure_cert_uses_existing_files(monkeypatch, tmp_path):
     c = tmp_path / "c.pem"
     k = tmp_path / "k.pem"
