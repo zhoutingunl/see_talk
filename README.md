@@ -17,58 +17,44 @@
 中:多模态问答(实时显示来源/路由/token)。
 右:`/dashboard` 成本与 QoS **实测对账**(节省率、缓存命中、路由分布、延迟分桶)。
 
+## 演示视频
+
+<video src="https://github.com/zhoutingunl/see_talk/raw/main/demo.mp4" controls width="320"></video>
+
+> 若上方未内联播放,点此查看:▶ [demo.mp4](./demo.mp4)(约 37 秒)。
+
 ## 架构一句话
 
 浏览器(粗闸门:限帧 / VAD / 抓帧)→ Flask(细闸门:OCR 路由 / 变化检测 / 缓存 / 上下文)
-→ **MiniMax-M3 多模态**(Anthropic 兼容直连,真看像素)。ASR 桌面用浏览器 Web Speech、
-移动用百炼;TTS 浏览器免费 / 百炼高音质。唯一主要付费项是 M3 图片 token,所有省钱手段都削它。
+→ **MiniMax-M3 多模态**(Anthropic 兼容直连,真看像素)。ASR 中文默认百炼 Paraformer(准),
+桌面可切免费 Web Speech;TTS 浏览器免费 / 百炼 CosyVoice 高音质。唯一主要付费项是 M3 图片 token,所有省钱手段都削它。
 
-## 当前进度
+## 功能(现状)
 
-### PR1 · 抓帧问答闭环
-- ✅ Flask 骨架 + `AIService`(M3 直连多模态 + Mock 降级层)
-- ✅ 前端开摄像头、按需抓 1 帧(降分 512px)、文字提问、显示回答与 token
-- ✅ 无 Key 时自动 Mock,项目照常可跑(产出明确标注"降级示例",不冒充)
+> 演进过程见仓库 PR 历史(20+ 个 `[feat]/[fix]`,逐个真机验证后合入)。下面是当前代码的实际能力。
 
-### PR2 · 语音交互闭环
-- ✅ **免手 VAD**:浏览器端能量阈值断句(`static/voice.js`)
-- ✅ **ASR 分层**:桌面浏览器 Web Speech(免费)/ 移动端百炼 Paraformer(`/api/asr` 代理,Key 仅在服务端)
-- ✅ **流式回答 + 首句优先 TTS**:`/api/ask_stream`(SSE)边收边播(`static/tts.js`)
-- ✅ 真机验证:M3 流式 SSE 实时输出;百炼 ASR 语音往返(合成「你好,这是语音识别测试」→ 准确转写)
+**视觉**
+- MiniMax-M3 原生多模态,直看像素;**按需抓帧**(提问瞬间 1 帧,降分 512px)。
+- **后置摄像头优先**(看世界),前/后可切;提示聚焦**手持/前景物体**,避免前置人脸干扰。
+- **OCR 优先路由**(`chi_sim+eng` 中英):纯文本场景只发文本省整图 token;无 tesseract 自动退化发图。
 
-### PR3 · 成本控制 + Dashboard
-- ✅ **视觉缓存 + 变化检测**:感知哈希(average hash),同画面同问命中缓存、零云调用(`vision_cache.py`)
-- ✅ **token 实测对账**:每轮记 实际 token vs Baseline(朴素每轮整图),算节省率(`metrics.py`,SQLite)
-- ✅ **延迟分桶**(纯文本 / 带图 P50/P95)+ **埋点 EventLog**
-- ✅ **Dashboard**:`/dashboard` 实时展示轮数 / 节省率 / 命中率 / 成本估算 / 延迟
-- ✅ 真机验证:同图同问第二次命中缓存(token 0)、实测节省率 95.4%
+**语音**
+- **免手 VAD** 断句(静音 1.2s,过短碎片丢弃,避免一句被切两段);用户开口即**打断**当前播报。
+- **ASR**:中文默认百炼 Paraformer(准),桌面可切免费浏览器 Web Speech;移动端统一百炼(`/api/asr` 代理,Key 仅服务端)。
+- **流式回答 + 首句优先 TTS**:`/api/ask_stream`(SSE)边收边播;TTS 浏览器免费 / 百炼 CosyVoice 高音质,可切。
 
-### PR4 · OCR 优先路由
-- ✅ **本地 Tesseract OCR**:纯文本场景(报错/英文/代码)先本地 OCR → 只发文本给 M3,省掉整图 token(`ocr_service.py`)
-- ✅ 路由判定:字符数 + 置信度阈值;非文本场景仍发降分图;无 tesseract 自动退化为发图
-- ✅ Dashboard 新增**路由分布**(ocr/image/cache)
-- ✅ 真机验证:英文报错图 → `route=ocr`,input token 72(发图需数百),M3 正确解释 TypeError
-- ✅ **中文 OCR**:`chi_sim+eng`,中文文本场景也走 OCR 路由(真机:「系统错误:文件未找到」识别置信度 96%)
-### PR6 · 百炼高音质 TTS(CosyVoice)
-- ✅ **CosyVoice 实时合成**(`ai/bailian_tts.py`,DashScope WS,复用 ASR 同一把 Key)
-- ✅ `/api/tts`(text → mp3);前端 TTS 双模式可切:浏览器(免费默认)/ 百炼高音质(付费档)
-- ✅ 首句优先沿用:逐句合成播放;百炼不可用自动回退浏览器
-- ✅ 真机验证:`cosyvoice-v2 + longxiaochun_v2` 合成 22050Hz 合法 MP3
-### PR7 · A/B 实验框架(§18)
-- ✅ **确定性分桶**:按 session_id 哈希分配变体(同用户恒定),`experiments.py`
-- ✅ 首个实验 `ocr_first`(on/off):量化"OCR 只发文本省 token vs 误判风险"
-- ✅ metrics 记录变体 + 按变体对比节省率/延迟;`/api/experiments` 看分配与对比
-- ✅ 前端 localStorage 稳定 session_id;真机验证 on/off 分桶 + 对比落库
-### PR8 · 评估框架(§17)
-- ✅ **可复现样例集**实测能力,避免伪指标:OCR 字符准确率 + 对话关键词命中率
-- ✅ 打分确定性(`difflib` 相似度 / 关键词命中),render/svc/ocr 可注入便于单测
-- ✅ `python3.11 evaluation.py` 跑真实服务出报告;真机:OCR 1.0、QA 1.0
-### PR9 · 连续分析模式(会议辅助,Story 5)
-- ✅ `/api/observe` 每帧客观描述并累积;**变化检测**画面没变即跳过(省钱)
-- ✅ `/api/summary` 把连续观察交给 M3 汇总成会议/场景纪要(纯文本汇总省 token)
-- ✅ 前端「连续分析」开关每 4s 抓帧 + 「生成纪要」按钮
-- ✅ 真机验证:幻灯片切换逐帧描述、重复帧跳过、纪要正确追踪变化
-- 🎉 design.md MVP + 全部 §14 省钱杠杆 + §17/§18 框架 + 会议辅助 全部落地
+**成本控制(实测对账)**
+- 省钱杠杆:按需触发 + 变化检测 + 视觉缓存 + 短上下文(默认10轮文本+当前1帧)+ 图像降分 + OCR优先 + VAD门控。
+- `/dashboard`:实际 token vs Baseline → **节省率(实测 95%+)**、缓存命中、路由分布、延迟分桶、埋点。
+- **A/B 框架**(`experiments.py`,`ocr_first` 变体对比)、**评估框架**(`evaluation.py`,OCR/对话准确率)。
+
+**连续分析(会议辅助)**
+- `/api/observe` 逐帧客观描述累积(变化检测跳过静止画面)+ `/api/summary` 交 M3 汇总成纪要。
+
+**工程**
+- Flask + gevent(`monkey.patch_all`,避免同步 requests 阻塞导致并发请求失败);无 Key 自动 Mock 降级,不冒充。
+- **手机 App**:`android/` WebView 套壳(摄像头/麦克风权限 + 自签 HTTPS + 前台屏幕常亮)。
+- Web 竖屏单列(像手机);**105 单测、覆盖率 96%**。
 
 ## 运行
 
@@ -101,7 +87,7 @@ python3.11 app.py             # http://localhost:8000
 python3.11 -m pytest -q --cov=. --cov-report=term-missing
 ```
 
-**实测(本机 Python 3.11):103 passed,覆盖率 96%。**
+**实测(本机 Python 3.11):105 passed,覆盖率 96%。**
 策略遵循 design.md §22:Mock 云(MiniMax/百炼),只测确定性逻辑(载荷构造、响应解析、
 降级、入参校验、图片解析),不测非确定性的 AI 答案本身。未覆盖部分为 gevent 启动入口
 与需真实 Key 的初始化分支。
@@ -128,6 +114,8 @@ see_talk/
   templates/        index.html · dashboard.html
   static/           app.js · voice.js(VAD+ASR)· tts.js(首句优先)· style.css
   tests/            pytest(Mock 云,确定性)
+  android/          手机 App(WebView 套壳,见 android/README.md)
+  design.md · SUBMISSION.md · README.md   设计 / 评审导览 / 本文
 ```
 
 ## 安全
