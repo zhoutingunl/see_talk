@@ -74,6 +74,13 @@ python3.11 app.py             # http://localhost:8000
 > OCR 优先路由需本地 tesseract;中文场景需 `chi_sim` 语言包(放入 tessdata 目录)。
 > 缺包时自动退化为发图,功能不受影响。可用 `OCR_LANG` 覆盖语言(默认自动 `chi_sim+eng`)。
 
+## 手机 App(Android)
+
+`android/` 是一个 WebView 套壳工程,把响应式 Web 装进原生壳在手机上验证。
+关键是补齐了普通套壳缺的**摄像头/麦克风权限**与**自签 HTTPS**(getUserMedia 需安全上下文)。
+用法:电脑 `SEETALK_HTTPS=1 python3.11 app.py` 启动 → Android Studio 打开 `android/` 一键 Run 到手机 → 填电脑的 `https://<IP>:8000`。详见 [`android/README.md`](./android/README.md)。
+> WebView 无浏览器语音,故语音走百炼 ASR(需配 `BAILIAN_API_KEY`);默认后置摄像头,适合"看世界"。
+
 ## 测试
 
 ```bash

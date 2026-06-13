@@ -1,0 +1,3 @@
+<resources>
+    <style name="Theme.SeeTalk" parent="Theme.AppCompat.Light.DarkActionBar" />
+</resources>

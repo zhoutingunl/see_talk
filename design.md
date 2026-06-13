@@ -227,7 +227,7 @@ OCR工具
 | 成本实测对账 Dashboard      | √       | √   |
 | 连续分析模式（会议辅助）          | √       | 部分  |
 | 视觉记忆（多帧历史，付费档）        | √       | 部分  |
-| Android WebView 套壳    | Stretch | 未实现 |
+| Android WebView 套壳    | Stretch | √(含摄像头/麦克风权限 + 自签 HTTPS) |
 
 ---
 
