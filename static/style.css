@@ -15,15 +15,16 @@ header .sub { color: #8b93a7; font-size: 13px; }
 }
 .badge.live { background: #243a2b; color: #9fe2b6; }
 
+/* 手机竖屏:窄单列、居中,像一部手机 */
 main {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
-  max-width: 1100px; margin: 20px auto; padding: 0 16px;
+  display: flex; flex-direction: column; gap: 14px;
+  max-width: 440px; margin: 16px auto; padding: 0 14px;
 }
-@media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+main.dash { max-width: 1000px; }   /* Dashboard 仍用宽布局 */
 
 .cam, .chat { background: #151823; border: 1px solid #232733; border-radius: 12px; padding: 14px; }
 .watching { font-size: 12px; color: #9fb0d0; margin-bottom: 8px; }
-video { width: 100%; border-radius: 8px; background: #000; aspect-ratio: 4/3; object-fit: cover; }
+video { width: 100%; border-radius: 8px; background: #000; aspect-ratio: 3/4; object-fit: cover; }
 .cam-controls { margin-top: 10px; display: flex; gap: 8px; }
 
 button {
