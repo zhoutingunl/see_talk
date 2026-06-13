@@ -5,10 +5,22 @@ PR1 范围:摄像头抓帧 + 文字提问 → M3 多模态回答(无 key 时 Moc
 """
 from __future__ import annotations
 
+import os
+
+# 生产用 gevent:给标准库(含 requests 依赖的 socket/ssl)打补丁。
+# 否则同步的 requests(调 M3/百炼)会阻塞事件循环 → 并发请求 Failed to fetch。
+# 测试下用 SEETALK_NO_GEVENT=1 跳过,避免干扰 pytest。
+if os.environ.get("SEETALK_NO_GEVENT") != "1":
+    try:
+        from gevent import monkey
+
+        monkey.patch_all()
+    except Exception:  # pragma: no cover - 未装 gevent 时退回阻塞模式
+        pass
+
 import base64
 import json
 import logging
-import os
 import re
 import subprocess
 import time
@@ -96,6 +108,13 @@ def _sse(ev: dict) -> str:
     return f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
 
 
+# 约束回答聚焦,避免"你正举着手机/对着镜头拍摄"这类与提问无关的描述
+_ANSWER_SYSTEM = (
+    "你是实时视觉对话助手。直接、简洁地回答用户关于当前画面的问题,只描述与问题相关的内容。"
+    "不要描述「用户正在拍摄/举着手机/对着镜头/把东西举在脸前」这类与提问无关的动作。"
+)
+
+
 @app.get("/")
 def index():
     return render_template("index.html")
@@ -155,7 +174,7 @@ def ask():
     else:
         q_send, img_send, route = _route_vision(question, image_b64, variant != "off")
         reply = get_service().vision_chat(
-            q_send, image_b64=img_send, media_type=media_type)
+            q_send, image_b64=img_send, media_type=media_type, system=_ANSWER_SYSTEM)
         cache_hit = False
         if image_b64 and reply.source == "minimax":
             _cache.put(h, question, reply)
@@ -206,7 +225,8 @@ def ask_stream():
         acc, src, in_tok, out_tok = "", "mock", 0, 0
         try:
             for ev in get_service().vision_chat_stream(
-                    q_send, image_b64=img_send, media_type=media_type):
+                    q_send, image_b64=img_send, media_type=media_type,
+                    system=_ANSWER_SYSTEM):
                 if ev["type"] == "delta":
                     acc += ev["text"]
                 elif ev["type"] == "done":

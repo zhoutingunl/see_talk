@@ -151,6 +151,7 @@ function setVoiceState(state) {
     idle: '已停止', error: '⚠️ 语音出错',
   };
   voiceState.textContent = map[state] || state;
+  if (state === 'speech') speaker.reset();   // 用户一开口即停播报(打断式）
 }
 
 micBtn.addEventListener('click', async () => {
@@ -159,6 +160,7 @@ micBtn.addEventListener('click', async () => {
     micBtn.textContent = '🎤 开始语音';
     micBtn.classList.remove('on');
   } else {
+    speaker.reset();              // 立即停掉正在播报的语音,准备下一轮
     await voice.start();
     micBtn.textContent = '⏹ 停止语音';
     micBtn.classList.add('on');
