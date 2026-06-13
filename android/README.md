@@ -57,3 +57,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 | TTS 自动播放 | `mediaPlaybackRequiresUserGesture=false` |
 | session_id(A/B) | `domStorageEnabled` 开启 localStorage |
 | 返回键 | WebView 后退 |
+| 前台不锁屏 | `FLAG_KEEP_SCREEN_ON`(仅前台生效、无需权限;摄像头演示不被自动锁屏打断) |
+
+> 关于后台/熄屏运行:Android 9+ 禁止后台访问摄像头,麦克风后台需前台服务(microphone 类型)+ 常驻通知,
+> 既脆弱又依赖系统版本。本壳只做"前台常亮"这个简单可靠方案;如需熄屏后台采集,另行加前台服务。
