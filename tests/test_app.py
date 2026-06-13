@@ -57,6 +57,16 @@ def test_ask_works_without_image(client):
     assert r.get_json()["answer"]
 
 
+def test_ensure_cert_uses_existing_files(monkeypatch, tmp_path):
+    c = tmp_path / "c.pem"
+    k = tmp_path / "k.pem"
+    c.write_text("cert")
+    k.write_text("key")
+    monkeypatch.setenv("SEETALK_CERT", str(c))
+    monkeypatch.setenv("SEETALK_KEY", str(k))
+    assert app_module.ensure_cert() == (str(c), str(k))
+
+
 def test_parse_image_handles_raw_and_dataurl():
     b64, mt = app_module._parse_image(f"data:image/webp;base64,{PNG_1PX_B64}")
     assert b64 == PNG_1PX_B64 and mt == "image/webp"

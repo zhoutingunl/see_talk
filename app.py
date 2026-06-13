@@ -8,7 +8,9 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import os
 import re
+import subprocess
 import time
 
 from flask import Flask, Response, jsonify, render_template, request
@@ -317,16 +319,43 @@ def observe_clear():
     return jsonify(ok=True)
 
 
-def main() -> None:
+def ensure_cert() -> tuple[str, str] | None:
+    """SEETALK_HTTPS=1 时确保有自签证书(供手机/局域网用 https 访问摄像头)。
+
+    优先用 SEETALK_CERT/SEETALK_KEY 指定的文件;不存在则用 openssl 自动生成。
+    生成失败则返回 None(回退 HTTP)。证书文件已 gitignore。
+    """
+    cert = os.getenv("SEETALK_CERT", "seetalk-cert.pem")
+    key = os.getenv("SEETALK_KEY", "seetalk-key.pem")
+    if os.path.exists(cert) and os.path.exists(key):
+        return cert, key
+    try:
+        subprocess.run(
+            ["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
+             "-keyout", key, "-out", cert, "-days", "365", "-subj", "/CN=seetalk"],
+            check=True, capture_output=True)
+        return cert, key
+    except Exception as e:  # pragma: no cover - 环境相关
+        log.warning("自签证书生成失败,回退 HTTP:%s", e)
+        return None
+
+
+def main() -> None:  # pragma: no cover - 进程入口
     host, port = "0.0.0.0", 8000
+    https = os.getenv("SEETALK_HTTPS", "").lower() in ("1", "true", "yes")
+    certkey = ensure_cert() if https else None
+    scheme = "https" if certkey else "http"
+    if https and not certkey:
+        log.warning("已请求 HTTPS 但证书不可用,降级为 HTTP")
     try:  # 生产用 gevent(design.md 技术栈);未装则退回 Flask 开发服务器
         from gevent.pywsgi import WSGIServer
 
-        log.info("SeeTalk on http://%s:%d (gevent)", host, port)
-        WSGIServer((host, port), app).serve_forever()
-    except ImportError:  # pragma: no cover
-        log.info("SeeTalk on http://%s:%d (flask dev)", host, port)
-        app.run(host=host, port=port)
+        kwargs = {"certfile": certkey[0], "keyfile": certkey[1]} if certkey else {}
+        log.info("SeeTalk on %s://%s:%d (gevent)", scheme, host, port)
+        WSGIServer((host, port), app, **kwargs).serve_forever()
+    except ImportError:
+        log.info("SeeTalk on %s://%s:%d (flask dev)", scheme, host, port)
+        app.run(host=host, port=port, ssl_context=certkey or None)
 
 
 if __name__ == "__main__":

@@ -67,7 +67,9 @@ python3.11 app.py             # http://localhost:8000
 浏览器打开后:点「开启摄像头」→ 举起物体 → 输入问题 → 提问。
 顶部徽标显示当前是「M3 已接入」还是「Mock 模式」。
 
-> 注:摄像头需 `https` 或 `localhost` 才能在浏览器开启(getUserMedia 安全上下文限制)。
+> 注:摄像头/麦克风需**安全上下文**才能开启(浏览器限制)。
+> - 本机:用 `http://localhost:8000`(localhost 视为安全)即可,**无需 HTTPS**。
+> - 手机/局域网:必须 HTTPS。启动时设 `SEETALK_HTTPS=1 python3.11 app.py`,会用 openssl 自动生成自签证书并以 `https://` 提供(自签证书浏览器会提示风险,点继续即可)。
 >
 > OCR 优先路由需本地 tesseract;中文场景需 `chi_sim` 语言包(放入 tessdata 目录)。
 > 缺包时自动退化为发图,功能不受影响。可用 `OCR_LANG` 覆盖语言(默认自动 `chi_sim+eng`)。

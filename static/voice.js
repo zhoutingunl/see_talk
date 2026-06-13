@@ -73,6 +73,11 @@ window.VoiceInput = class VoiceInput {
 
   // ---------- 移动端:录 PCM + 能量 VAD → 百炼 ----------
   async _startBailian() {
+    if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) {
+      this.onState('error'); this.active = false;
+      console.warn('麦克风不可用:非安全上下文,请用 https 或 localhost');
+      return;
+    }
     try {
       this._stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (e) { this.onState('error'); this.active = false; return; }

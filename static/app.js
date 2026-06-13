@@ -46,8 +46,16 @@ async function refreshHealth() {
   } catch { badge.textContent = '后端不可达'; }
 }
 
+// 安全上下文检查:非 https 且非 localhost 时 mediaDevices 不可用
+function mediaSupported() {
+  return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+}
+const INSECURE_HINT = '当前页面非安全上下文，浏览器禁用了摄像头/麦克风。'
+  + '请用 http://localhost:8000 访问；手机/局域网请改用 https（设 SEETALK_HTTPS=1 启动）。';
+
 // ---------- 摄像头 ----------
 startCam.addEventListener('click', async () => {
+  if (!mediaSupported()) { addLine('系统', INSECURE_HINT, 'err'); return; }
   try {
     stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
     video.srcObject = stream;
