@@ -85,7 +85,8 @@ window.VoiceInput = class VoiceInput {
     this._ctx = new Ctx();
     const source = this._ctx.createMediaStreamSource(this._stream);
     const node = this._ctx.createScriptProcessor(4096, 1, 1);
-    const SILENCE_MS = 800, THRESH = 0.012;
+    // 静音阈值放宽到 1.2s:容忍句中自然停顿,避免一句话被切成两段
+    const SILENCE_MS = 1200, THRESH = 0.012;
     const frameMs = (4096 / this._ctx.sampleRate) * 1000;
 
     node.onaudioprocess = (e) => {
@@ -115,6 +116,8 @@ window.VoiceInput = class VoiceInput {
     this._buffers = []; this._speaking = false; this._silenceMs = 0;
     if (!chunks.length) return;
     const pcm = this._encode16k(chunks, this._ctx.sampleRate);
+    // 丢弃过短碎片(<0.4s):避免尾音/口水音单独成段(16k 16bit → 0.4s≈12800字节)
+    if (pcm.byteLength < 12800) { this.onState(this.active ? 'listening' : 'idle'); return; }
     this.onState('thinking');
     this._sendToBailian(pcm);
   }
