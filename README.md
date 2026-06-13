@@ -5,6 +5,18 @@
 > 📋 **评审先看这里**:[`SUBMISSION.md`](./SUBMISSION.md) —— 提交说明/评审导览,含题目要求的两份交付物(用户故事 计划 vs 实现、成本控制 想到 vs 采用)。
 > 完整设计见 [`design.md`](./design.md)。
 
+## 界面
+
+<p>
+  <img src="docs/screenshots/web-ui.png" width="250" alt="主界面总览" />
+  <img src="docs/screenshots/web-chat.png" width="250" alt="多模态对话" />
+  <img src="docs/screenshots/dashboard.png" width="250" alt="成本/QoS 看板" />
+</p>
+
+左:竖屏主界面(摄像头预览 + 语音/连续分析控件;图为无头测试用摄像头画面)。
+中:多模态问答(实时显示来源/路由/token)。
+右:`/dashboard` 成本与 QoS **实测对账**(节省率、缓存命中、路由分布、延迟分桶)。
+
 ## 架构一句话
 
 浏览器(粗闸门:限帧 / VAD / 抓帧)→ Flask(细闸门:OCR 路由 / 变化检测 / 缓存 / 上下文)
