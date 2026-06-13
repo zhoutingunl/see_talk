@@ -8,6 +8,7 @@ import android.net.http.SslError
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
+import android.view.WindowManager
 import android.webkit.PermissionRequest
 import android.webkit.SslErrorHandler
 import android.webkit.WebChromeClient
@@ -40,6 +41,9 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        // 前台时保持屏幕常亮、不自动锁屏(摄像头/麦克风演示不被打断)。
+        // 仅当本界面可见时生效;退到后台自动恢复正常锁屏,无需额外权限。
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         webView = findViewById(R.id.webview)
         configureWebView()
         requestMediaPermissions()
