@@ -8,3 +8,4 @@ htmlcov/
 *.db-*
 *.pem
 .DS_Store
+/skills/
